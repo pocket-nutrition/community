@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}User feedback — Food Dataset · Pocket Nutrition{% endblock %}
+{% block content %}
+<h1>User feedback
+  <span style="font-size:1rem;font-weight:400;color:#888">({{ total }} pending report{{ '' if total == 1 else 's' }})</span>
+</h1>
+
+<div class="info-box">
+  <strong>What is this page for?</strong>
+  Anonymous users of the public sandbox can report that an ingredient's data looks wrong or is missing,
+  via a guided form (category → specific error → proposed value). Their structured corrections are
+  collected here, grouped by ingredient, for the team to review.
+  This page is <strong>read-only</strong>: apply accepted corrections separately, via the
+  <code>pocket-nutrition-knowledge-editor</code> review tool, which commits to the knowledge
+  repository. Feedback never modifies the knowledge base directly.
+  {% if total == 0 %}<br><br>No pending feedback right now.{% endif %}
+</div>
+
+{% if summary %}
+<div class="card">
+  <h2>By ingredient</h2>
+  <table>
+    <thead>
+      <tr><th>Ingredient</th><th>Reports</th><th>Last report</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for row in summary %}
+      <tr>
+        <td>
+          {% if row.ingredient_id and row.resolved %}
+            <a class="link" href="/ui/ingredients/{{ row.ingredient_id }}">{{ row.ingredient_id }}</a>
+          {% elif row.ingredient_id %}
+            {{ row.ingredient_id }} <span class="badge badge-unlinked">unresolved</span>
+          {% else %}
+            <em>(unknown)</em>
+          {% endif %}
+          <div class="field-help">{{ row.reported_name }}</div>
+        </td>
+        <td>{{ row.report_count }}</td>
+        <td>{{ row.last_at }}</td>
+        <td><a class="link" href="/ui/feedback?ingredient={{ row.ingredient_id or '' }}">view</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>
+    {% if selected %}Reports for “{{ selected }}” — <a class="link" href="/ui/feedback">show all</a>{% else %}Recent reports{% endif %}
+  </h2>
+  {% if reports %}
+  <table>
+    <thead>
+      <tr><th>When</th><th>Ingredient</th><th>Corrections</th><th>Comment</th><th>Context</th></tr>
+    </thead>
+    <tbody>
+      {% for r in reports %}
+      <tr>
+        <td style="white-space:nowrap">{{ r.created_at }}</td>
+        <td>
+          {% if r.ingredient_id and r.resolved %}
+            <a class="link" href="/ui/ingredients/{{ r.ingredient_id }}">{{ r.ingredient_id }}</a>
+          {% else %}
+            {{ r.reported_name }}
+          {% endif %}
+        </td>
+        <td>
+          {% if r.corrections %}
+            {% for c in r.corrections %}
+              <div class="field-help">
+                {{ c.category }} › {{ c.code }}{% if c.value %} : <strong>{{ c.value }}{% if c.unit %} {{ c.unit }}{% endif %}</strong>{% endif %}
+              </div>
+            {% endfor %}
+          {% else %}
+            <span style="color:#bbb">—</span>
+          {% endif %}
+        </td>
+        <td>{{ r.comment or '' }}</td>
+        <td class="field-help">
+          {% if r.cooking_method %}{{ r.cooking_method }}{% endif %}
+          {% if r.measured_state %} · pesé {{ r.measured_state }}{% endif %}
+          {% if r.source %} · {{ r.source }}{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#888">No reports.</p>
+  {% endif %}
+</div>
+{% endblock %}

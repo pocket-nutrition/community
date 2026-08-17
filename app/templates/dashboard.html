@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Food Dataset · Pocket Nutrition{% endblock %}
+{% block content %}
+<style>
+  .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .dash-map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+  .stat-card { padding: 1.2rem 1.5rem; }
+  .stat-card h2 { font-size: 1rem; margin-bottom: 0.9rem; display: flex; align-items: center; gap: 0.5rem; }
+  .stat-row { display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid #f0f0f0; font-size: 0.88rem; }
+  .stat-row:last-of-type { border-bottom: none; }
+  .stat-label { color: #555; }
+  .stat-value { font-weight: 700; font-size: 1rem; color: var(--ink); }
+  .stat-value.muted { color: #888; font-weight: 400; }
+  .progress-wrap { margin-top: 0.9rem; }
+  .progress-label { font-size: 0.75rem; color: #777; margin-bottom: 0.3rem; display: flex; justify-content: space-between; }
+  .progress-bar { height: 8px; border-radius: 4px; background: #eee; overflow: hidden; display: flex; }
+  .progress-linked { background: #27ae60; }
+  .progress-unlinked { background: #f39c12; }
+  .progress-dismissed { background: #bdc3c7; }
+  .dash-meta { font-size: 0.8rem; color: #888; margin-bottom: 1.5rem; }
+  .section-title { font-size: 1rem; font-weight: 700; color: var(--ink); margin-bottom: 0.75rem; }
+</style>
+
+<h1>Dashboard</h1>
+{% if stats.loaded_at %}
+<p class="dash-meta">Data loaded at {{ stats.loaded_at }}</p>
+{% else %}
+<p class="dash-meta" style="color:#c0392b;">Cache not loaded — click Reload.</p>
+{% endif %}
+
+<p class="section-title">Knowledge base</p>
+<div class="dash-grid">
+  <div class="card stat-card">
+    <h2>Ingredients</h2>
+    <div class="stat-row">
+      <span class="stat-label">Total</span>
+      <span class="stat-value">{{ stats.ingredients.total }}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">French name (name_fr)</span>
+      {% if stats.ingredients.total > 0 %}
+      <span class="stat-value">{{ stats.ingredients.with_name_fr }}
+        <span class="muted" style="font-size:0.78rem;font-weight:400;">
+          ({{ (stats.ingredients.with_name_fr / stats.ingredients.total * 100) | round(0) | int }}%)
+        </span>
+      </span>
+      {% else %}
+      <span class="stat-value muted">—</span>
+      {% endif %}
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">English name (name_en)</span>
+      {% if stats.ingredients.total > 0 %}
+      <span class="stat-value">{{ stats.ingredients.with_name_en }}
+        <span class="muted" style="font-size:0.78rem;font-weight:400;">
+          ({{ (stats.ingredients.with_name_en / stats.ingredients.total * 100) | round(0) | int }}%)
+        </span>
+      </span>
+      {% else %}
+      <span class="stat-value muted">—</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <h2>Cooking Relationships</h2>
+    <div class="stat-row">
+      <span class="stat-label">Total</span>
+      <span class="stat-value">{{ stats.relationships.total }}</span>
+    </div>
+  </div>
+
+  <div class="card stat-card">
+    <h2>Training Pairs</h2>
+    {% if training_pairs %}
+    <div class="stat-row">
+      <span class="stat-label">Total</span>
+      <span class="stat-value">{{ training_pairs.total }}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Known (exact yield)</span>
+      <span class="stat-value" style="color:#27ae60;">{{ training_pairs.known }}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Theoretical (group median)</span>
+      <span class="stat-value" style="color:#f39c12;">{{ training_pairs.theoretical }}</span>
+    </div>
+    {% if training_pairs.total > 0 %}
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Known {{ (training_pairs.known / training_pairs.total * 100) | round(0) | int }}%</span>
+        <span>Theoretical {{ (training_pairs.theoretical / training_pairs.total * 100) | round(0) | int }}%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-linked" style="width:{{ (training_pairs.known / training_pairs.total * 100) | round(1) }}%"></div>
+        <div class="progress-unlinked" style="width:{{ (training_pairs.theoretical / training_pairs.total * 100) | round(1) }}%"></div>
+      </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="stat-row">
+      <span class="stat-label muted">No data — run ingest pipeline first.</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<p class="section-title">Source mappings</p>
+<div class="dash-map-grid">
+  {% for source, s in stats.mappings.items() %}
+  <div class="card stat-card">
+    <h2><span class="badge badge-{{ source }}">{{ source | upper }}</span></h2>
+    <div class="stat-row">
+      <span class="stat-label">Total</span>
+      <span class="stat-value">{{ s.total }}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Linked</span>
+      <span class="stat-value" style="color:#27ae60;">{{ s.linked }}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Pending (unlinked)</span>
+      <span class="stat-value" style="color:#f39c12;">{{ s.unlinked }}</span>
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">Dismissed (composite)</span>
+      <span class="stat-value muted">{{ s.dismissed }}</span>
+    </div>
+    {% if s.total > 0 %}
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>Linked {{ (s.linked / s.total * 100) | round(0) | int }}%</span>
+        <span>Pending {{ (s.unlinked / s.total * 100) | round(0) | int }}%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-linked" style="width:{{ (s.linked / s.total * 100) | round(1) }}%"></div>
+        <div class="progress-unlinked" style="width:{{ (s.unlinked / s.total * 100) | round(1) }}%"></div>
+        <div class="progress-dismissed" style="width:{{ (s.dismissed / s.total * 100) | round(1) }}%"></div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>
+
+{% if stats.mappings.values() | selectattr('unlinked', 'gt', 0) | list %}
+<div class="info-box">
+  There are unmapped source entries — see <code>/api/mappings/unlinked</code> or the
+  <code>pocket-nutrition-knowledge-editor</code> tool to link them to canonical ingredients.
+</div>
+{% endif %}
+{% endblock %}

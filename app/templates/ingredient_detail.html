@@ -1,0 +1,413 @@
+{% extends "base.html" %}
+{% block title %}{{ ingredient.id }} — Food Dataset · Pocket Nutrition{% endblock %}
+{% block content %}
+<h1>{{ ingredient.name_en }}</h1>
+<p style="color:#666;margin-bottom:1.5rem"><code>{{ ingredient.id }}</code> &nbsp;·&nbsp; {{ ingredient.food_group }} &nbsp;·&nbsp; {{ ingredient.states.keys() | join(', ') }}</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+  <div class="card" style="margin:0">
+    <h2>Details</h2>
+    <table>
+      <tr><td><strong>ID</strong></td><td><code>{{ ingredient.id }}</code></td></tr>
+      <tr><td><strong>English</strong></td><td>{{ ingredient.name_en }}</td></tr>
+      <tr><td><strong>French</strong></td><td>{{ ingredient.name_fr or "—" }}</td></tr>
+      <tr><td><strong>Food group</strong></td><td><span class="badge badge-{{ ingredient.food_group }}">{{ ingredient.food_group }}</span></td></tr>
+      <tr><td><strong>States</strong></td><td>{{ ingredient.states.keys() | join(', ') }}</td></tr>
+      {% if ingredient.notes %}<tr><td><strong>Notes</strong></td><td>{{ ingredient.notes }}</td></tr>{% endif %}
+    </table>
+  </div>
+
+  <div class="card" style="margin:0">
+    <h2>Consumption &amp; serving</h2>
+    <table>
+      <tr><td><strong>Typical preparation</strong></td><td>{{ ingredient.typical_state or "—" }}</td></tr>
+      <tr><td><strong>Can eat raw</strong></td><td>{% if ingredient.can_eat_raw is none %}—{% elif ingredient.can_eat_raw %}Yes{% else %}No{% endif %}</td></tr>
+      <tr><td><strong>Can be cooked</strong></td><td>{% if ingredient.can_eat_cooked is none %}—{% elif ingredient.can_eat_cooked %}Yes{% else %}No{% endif %}</td></tr>
+      {% for state_name, meta in ingredient.states.items() %}
+      <tr><td><strong>Portion ({{ state_name }})</strong></td><td>{% if meta.portion_g %}{{ meta.portion_g | int }} g{% else %}—{% endif %}</td></tr>
+      {% if meta.density_g_ml %}<tr><td><strong>Density ({{ state_name }})</strong></td><td>{{ "%.2f"|format(meta.density_g_ml) }} g/mL</td></tr>{% endif %}
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+{% if relationships %}
+<div class="card">
+  <h2>Cooking relationships</h2>
+  <table>
+    <thead><tr><th>Method</th><th>Yield factor</th><th>Confidence</th><th>Source</th></tr></thead>
+    <tbody>
+      {% for rel in relationships %}
+      <tr>
+        <td>{{ rel.cooking_method }}</td>
+        <td>{{ "%.3f"|format(rel.yield_factor) }}</td>
+        <td>{{ "%.2f"|format(rel.confidence) if rel.confidence else "—" }}</td>
+        <td>{{ rel.source or "—" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if training_pairs %}
+<div class="card">
+  <h2>Training pairs <span style="font-size:0.8rem;font-weight:400;color:#888">(v2_training_pairs)</span></h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Method</th>
+        <th>Yield</th>
+        <th>Type</th>
+        <th style="text-align:right">kcal</th>
+        <th style="text-align:right">Protein</th>
+        <th style="text-align:right">Fat</th>
+        <th style="text-align:right">Carbs</th>
+        <th style="text-align:right">Water</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in training_pairs %}
+      <tr>
+        <td>{{ p.cooking_method }}</td>
+        <td>{{ "%.3f"|format(p.yield_f) if p.yield_f else "—" }}</td>
+        <td>
+          {% if p.is_theoretical %}
+          <span style="color:#f39c12;font-size:0.8rem;font-weight:600">theoretical</span>
+          {% else %}
+          <span style="color:#27ae60;font-size:0.8rem;font-weight:600">known</span>
+          {% endif %}
+        </td>
+        <td style="text-align:right;color:#555">{% if p.cooked.energy_kcal is not none %}{{ p.cooked.energy_kcal | round(1) }}{% else %}—{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if p.cooked.protein_g is not none %}{{ p.cooked.protein_g | round(1) }} g{% else %}—{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if p.cooked.fat_g is not none %}{{ p.cooked.fat_g | round(1) }} g{% else %}—{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if p.cooked.carbohydrates_g is not none %}{{ p.cooked.carbohydrates_g | round(1) }} g{% else %}—{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if p.cooked.water_g is not none %}{{ p.cooked.water_g | round(1) }} g{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div hx-get="/ui/ingredients/{{ ingredient.id }}/predictions"
+     hx-trigger="load"
+     hx-swap="outerHTML">
+  <div class="card">
+    <p style="color:#888">Loading nutritional predictions…</p>
+  </div>
+</div>
+
+{% set total_refs = (ciqual_rows|length) + (mccance_rows|length) + (usda_foundation_rows|length) + (usda_sr_rows|length) + (usda_rows|length) + (usda_cooking_yield_rows|length) %}
+{% if total_refs > 0 %}
+<div class="card" style="padding:0;overflow:hidden">
+  <div style="display:grid;grid-template-columns:280px 1fr;min-height:400px">
+
+    <!-- Left: reference list, grouped by cooking_method -->
+    <div style="border-right:1px solid #e5e5e5;overflow-y:auto;max-height:600px">
+      {% macro ref_item(panel_id, source_label, item_label, sub_label="", method="raw") %}
+      <button
+        onclick="selectRef('{{ panel_id }}')"
+        id="btn-{{ panel_id }}"
+        class="ref-btn"
+        style="display:block;width:100%;text-align:left;padding:0.65rem 1rem;border:none;background:none;cursor:pointer;border-bottom:1px solid #f0f0f0;transition:background 120ms"
+      >
+        <span style="display:flex;align-items:center;gap:0.4rem;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#888;margin-bottom:0.15rem">
+          <span>{{ source_label }}</span>
+          <span class="badge badge-method-{{ method }}" style="font-size:0.6rem;padding:0.05rem 0.4rem;letter-spacing:0.04em">{{ method }}</span>
+        </span>
+        <span style="display:block;font-size:0.85rem;color:#222;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ item_label }}</span>
+        {% if sub_label %}<span style="display:block;font-size:0.75rem;color:#aaa;margin-top:0.1rem">{{ sub_label }}</span>{% endif %}
+      </button>
+      {% endmacro %}
+
+      {% macro method_header(label) %}
+      <div style="padding:0.4rem 1rem;background:#fafafa;border-bottom:1px solid #e5e5e5;font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#555">{{ label }}</div>
+      {% endmacro %}
+
+      {% set entries = [] %}
+      {% for row in ciqual_rows %}
+        {% set _ = entries.append({
+          "panel_id": "ciqual-" ~ loop.index0,
+          "source_label": "Ciqual",
+          "item_label": row.alim_nom_fr,
+          "sub_label": "code " ~ row.alim_code,
+          "method": ref_methods["ciqual"].get(row.alim_code|string, "raw"),
+        }) %}
+      {% endfor %}
+      {% for row in mccance_rows %}
+        {% set _ = entries.append({
+          "panel_id": "mccance-" ~ loop.index0,
+          "source_label": "McCance",
+          "item_label": row.food_name,
+          "sub_label": row.food_code,
+          "method": ref_methods["mccance"].get(row.food_code|string, "raw"),
+        }) %}
+      {% endfor %}
+      {% for row in usda_foundation_rows %}
+        {% set _ = entries.append({
+          "panel_id": "usdaf-" ~ loop.index0,
+          "source_label": "USDA Foundation",
+          "item_label": row.description,
+          "sub_label": "FDC " ~ row.fdc_id,
+          "method": ref_methods["usda_foundation"].get(row.fdc_id|string, "raw"),
+        }) %}
+      {% endfor %}
+      {% for row in usda_sr_rows %}
+        {% set _ = entries.append({
+          "panel_id": "usdasr-" ~ loop.index0,
+          "source_label": "USDA SR Legacy",
+          "item_label": row.description,
+          "sub_label": "FDC " ~ row.fdc_id,
+          "method": ref_methods["usda_sr"].get(row.fdc_id|string, "raw"),
+        }) %}
+      {% endfor %}
+      {% for row in usda_rows %}
+        {% set _ = entries.append({
+          "panel_id": "usdafnd-" ~ loop.index0,
+          "source_label": "USDA FNDDS",
+          "item_label": row.description,
+          "sub_label": "FDC " ~ row.fdc_id,
+          "method": ref_methods["usda"].get(row.fdc_id|string, "raw"),
+        }) %}
+      {% endfor %}
+
+      {% set method_order = [
+        ("raw", "Raw"),
+        ("boiled", "Boiled"),
+        ("steamed", "Steamed"),
+        ("grilled", "Grilled"),
+        ("roasted", "Roasted"),
+        ("fried", "Fried"),
+        ("cooked", "Cooked"),
+      ] %}
+      {% for method, label in method_order %}
+        {% set bucket = entries | selectattr("method", "equalto", method) | list %}
+        {% if bucket %}
+          {{ method_header(label) }}
+          {% for entry in bucket %}
+            {{ ref_item(entry.panel_id, entry.source_label, entry.item_label, entry.sub_label, entry.method) }}
+          {% endfor %}
+        {% endif %}
+      {% endfor %}
+
+      {% if usda_cooking_yield_rows %}
+        {{ method_header("USDA Cooking Yields (name match)") }}
+        {% for row in usda_cooking_yield_rows %}
+          {{ ref_item("usdacy-" ~ loop.index0, "USDA Cooking Yield", row.food_description, row.cooking_description) }}
+        {% endfor %}
+      {% endif %}
+    </div>
+
+    <!-- Right: nutrient panels -->
+    <div id="ref-detail" style="padding:1.5rem;overflow-y:auto;max-height:600px">
+      <p id="ref-placeholder" style="color:#aaa;font-size:0.9rem;margin-top:2rem;text-align:center">← Select a reference on the left</p>
+
+      {% macro nutrient_row(label, val, fmt="%.2f") %}
+      <tr><td>{{ label }}</td><td>{{ (fmt)|format(val) if val is not none else "—" }}</td></tr>
+      {% endmacro %}
+
+      {% macro section_header(label) %}
+      <tr><td colspan="2" style="background:#f5f5f5;font-size:0.8rem;color:#555;padding:0.3rem 0.5rem"><strong>{{ label }}</strong></td></tr>
+      {% endmacro %}
+
+      {% for row in ciqual_rows %}
+      {% set method = ref_methods["ciqual"].get(row.alim_code|string, "raw") %}
+      <div class="ref-panel" id="panel-ciqual-{{ loop.index0 }}" style="display:none">
+        <h3 style="margin-top:0">{{ row.alim_nom_fr }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· Ciqual · code {{ row.alim_code }}</small>
+          <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
+        </h3>
+        <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g edible portion</p>
+        <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
+          {{ section_header("Macronutrients") }}
+          {{ nutrient_row("Energy (kcal)", row.energy_kcal, "%.1f") }}
+          {{ nutrient_row("Water (g)", row.water_g) }}
+          {{ nutrient_row("Proteins (g)", row.proteins_g) }}
+          {{ nutrient_row("Fat (g)", row.fat_g) }}
+          {{ nutrient_row("Carbohydrates (g)", row.carbohydrates_g) }}
+          {{ nutrient_row("Sugars (g)", row.sugars_g) }}
+          {{ nutrient_row("Fiber (g)", row.fiber_g) }}
+          {{ section_header("Lipid profile") }}
+          {{ nutrient_row("Saturated fat (g)", row.saturated_fat_g) }}
+          {{ nutrient_row("Monounsaturated fat (g)", row.monounsaturated_fat_g) }}
+          {{ nutrient_row("Polyunsaturated fat (g)", row.polyunsaturated_fat_g) }}
+          {{ nutrient_row("Cholesterol (mg)", row.cholesterol_mg) }}
+          {{ section_header("Minerals") }}
+          {{ nutrient_row("Calcium (mg)", row.calcium_mg) }}
+          {{ nutrient_row("Iron (mg)", row.iron_mg) }}
+          {{ nutrient_row("Magnesium (mg)", row.magnesium_mg) }}
+          {{ nutrient_row("Sodium (mg)", row.sodium_mg) }}
+          {{ nutrient_row("Potassium (mg)", row.potassium_mg) }}
+          {{ nutrient_row("Phosphorus (mg)", row.phosphorus_mg) }}
+          {{ nutrient_row("Zinc (mg)", row.zinc_mg) }}
+          {{ section_header("Vitamins") }}
+          {{ nutrient_row("Vitamin A (µg)", row.vitamin_a_ug) }}
+          {{ nutrient_row("Vitamin C (mg)", row.vitamin_c_mg) }}
+          {{ nutrient_row("Vitamin D (µg)", row.vitamin_d_ug) }}
+          {{ nutrient_row("Vitamin B6 (mg)", row.vitamin_b6_mg) }}
+          {{ nutrient_row("Vitamin B12 (µg)", row.vitamin_b12_ug) }}
+          {{ nutrient_row("Niacin (mg)", row.niacin_mg) }}
+        </tbody></table>
+      </div>
+      {% endfor %}
+
+      {% for row in mccance_rows %}
+      {% set method = ref_methods["mccance"].get(row.food_code|string, "raw") %}
+      <div class="ref-panel" id="panel-mccance-{{ loop.index0 }}" style="display:none">
+        <h3 style="margin-top:0">{{ row.food_name }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· McCance &amp; Widdowson · {{ row.food_code }}{% if row.food_group %} · {{ row.food_group }}{% endif %}</small>
+          <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
+        </h3>
+        <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g edible portion</p>
+        <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
+          {{ section_header("Macronutrients") }}
+          {{ nutrient_row("Energy (kcal)", row.energy_kcal, "%.1f") }}
+          {{ nutrient_row("Energy (kJ)", row.energy_kj, "%.1f") }}
+          {{ nutrient_row("Water (g)", row.water_g) }}
+          {{ nutrient_row("Protein (g)", row.protein_g) }}
+          {{ nutrient_row("Fat (g)", row.fat_g) }}
+          {{ nutrient_row("Carbohydrate (g)", row.carbohydrate_g) }}
+          {{ nutrient_row("Fibre (g)", row.fibre_g) }}
+          {{ section_header("Lipid profile") }}
+          {{ nutrient_row("Saturated fat (g)", row.saturated_fat_g) }}
+          {{ nutrient_row("Cholesterol (mg)", row.cholesterol_mg) }}
+          {{ section_header("Minerals") }}
+          {{ nutrient_row("Calcium (mg)", row.calcium_mg) }}
+          {{ nutrient_row("Iron (mg)", row.iron_mg) }}
+          {{ nutrient_row("Magnesium (mg)", row.magnesium_mg) }}
+          {{ nutrient_row("Sodium (mg)", row.sodium_mg) }}
+          {{ nutrient_row("Potassium (mg)", row.potassium_mg) }}
+          {{ nutrient_row("Phosphorus (mg)", row.phosphorus_mg) }}
+          {{ nutrient_row("Zinc (mg)", row.zinc_mg) }}
+          {{ section_header("Vitamins") }}
+          {{ nutrient_row("Vitamin A (µg)", row.vitamin_a_ug) }}
+          {{ nutrient_row("Vitamin C (mg)", row.vitamin_c_mg) }}
+          {{ nutrient_row("Vitamin D (µg)", row.vitamin_d_ug) }}
+        </tbody></table>
+      </div>
+      {% endfor %}
+
+      {% for row in usda_foundation_rows %}
+      {% set method = ref_methods["usda_foundation"].get(row.fdc_id|string, "raw") %}
+      <div class="ref-panel" id="panel-usdaf-{{ loop.index0 }}" style="display:none">
+        <h3 style="margin-top:0">{{ row.description }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· USDA Foundation · FDC {{ row.fdc_id }}{% if row.food_category %} · {{ row.food_category }}{% endif %}</small>
+          <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
+        </h3>
+        <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g</p>
+        <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
+          {{ section_header("Macronutrients") }}
+          {{ nutrient_row("Energy (kcal)", row.energy_kcal, "%.1f") }}
+          {{ nutrient_row("Protein (g)", row.protein_g) }}
+          {{ nutrient_row("Fat (g)", row.fat_g) }}
+          {{ nutrient_row("Carbohydrates (g)", row.carbohydrates_g) }}
+          {{ nutrient_row("Fiber (g)", row.fiber_g) }}
+          {{ section_header("Lipid profile") }}
+          {{ nutrient_row("Saturated fat (g)", row.saturated_fat_g) }}
+          {{ nutrient_row("Monounsaturated fat (g)", row.monounsaturated_fat_g) }}
+          {{ nutrient_row("Polyunsaturated fat (g)", row.polyunsaturated_fat_g) }}
+          {{ nutrient_row("Cholesterol (mg)", row.cholesterol_mg) }}
+          {{ section_header("Minerals") }}
+          {{ nutrient_row("Calcium (mg)", row.calcium_mg) }}
+          {{ nutrient_row("Iron (mg)", row.iron_mg) }}
+          {{ nutrient_row("Magnesium (mg)", row.magnesium_mg) }}
+          {{ nutrient_row("Sodium (mg)", row.sodium_mg) }}
+          {{ nutrient_row("Potassium (mg)", row.potassium_mg) }}
+          {{ nutrient_row("Phosphorus (mg)", row.phosphorus_mg) }}
+          {{ nutrient_row("Zinc (mg)", row.zinc_mg) }}
+          {{ section_header("Vitamins") }}
+          {{ nutrient_row("Vitamin A (µg)", row.vitamin_a_ug) }}
+          {{ nutrient_row("Vitamin C (mg)", row.vitamin_c_mg) }}
+          {{ nutrient_row("Vitamin D (µg)", row.vitamin_d_ug) }}
+          {{ nutrient_row("Vitamin B6 (mg)", row.vitamin_b6_mg) }}
+          {{ nutrient_row("Vitamin B12 (µg)", row.vitamin_b12_ug) }}
+          {{ nutrient_row("Niacin (mg)", row.niacin_mg) }}
+        </tbody></table>
+      </div>
+      {% endfor %}
+
+      {% for row in usda_sr_rows %}
+      {% set method = ref_methods["usda_sr"].get(row.fdc_id|string, "raw") %}
+      <div class="ref-panel" id="panel-usdasr-{{ loop.index0 }}" style="display:none">
+        <h3 style="margin-top:0">{{ row.description }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· USDA SR Legacy · FDC {{ row.fdc_id }}{% if row.food_category %} · {{ row.food_category }}{% endif %}</small>
+          <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
+        </h3>
+        <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g</p>
+        <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
+          {{ section_header("Macronutrients") }}
+          {{ nutrient_row("Energy (kcal)", row.energy_kcal, "%.1f") }}
+          {{ nutrient_row("Protein (g)", row.protein_g) }}
+          {{ nutrient_row("Fat (g)", row.fat_g) }}
+          {{ nutrient_row("Carbohydrates (g)", row.carbohydrates_g) }}
+          {{ nutrient_row("Fiber (g)", row.fiber_g) }}
+          {{ section_header("Lipid profile") }}
+          {{ nutrient_row("Saturated fat (g)", row.saturated_fat_g) }}
+          {{ nutrient_row("Monounsaturated fat (g)", row.monounsaturated_fat_g) }}
+          {{ nutrient_row("Polyunsaturated fat (g)", row.polyunsaturated_fat_g) }}
+          {{ nutrient_row("Cholesterol (mg)", row.cholesterol_mg) }}
+          {{ section_header("Minerals") }}
+          {{ nutrient_row("Calcium (mg)", row.calcium_mg) }}
+          {{ nutrient_row("Iron (mg)", row.iron_mg) }}
+          {{ nutrient_row("Magnesium (mg)", row.magnesium_mg) }}
+          {{ nutrient_row("Sodium (mg)", row.sodium_mg) }}
+          {{ nutrient_row("Potassium (mg)", row.potassium_mg) }}
+          {{ nutrient_row("Phosphorus (mg)", row.phosphorus_mg) }}
+          {{ nutrient_row("Zinc (mg)", row.zinc_mg) }}
+          {{ section_header("Vitamins") }}
+          {{ nutrient_row("Vitamin A (µg)", row.vitamin_a_ug) }}
+          {{ nutrient_row("Vitamin C (mg)", row.vitamin_c_mg) }}
+          {{ nutrient_row("Vitamin D (µg)", row.vitamin_d_ug) }}
+          {{ nutrient_row("Vitamin B6 (mg)", row.vitamin_b6_mg) }}
+          {{ nutrient_row("Vitamin B12 (µg)", row.vitamin_b12_ug) }}
+          {{ nutrient_row("Niacin (mg)", row.niacin_mg) }}
+        </tbody></table>
+      </div>
+      {% endfor %}
+
+      {% for row in usda_rows %}
+      {% set method = ref_methods["usda"].get(row.fdc_id|string, "raw") %}
+      <div class="ref-panel" id="panel-usdafnd-{{ loop.index0 }}" style="display:none">
+        <h3 style="margin-top:0">{{ row.description }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· USDA FNDDS · FDC {{ row.fdc_id }}{% if row.wweia_category %} · {{ row.wweia_category }}{% endif %}</small>
+          <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
+        </h3>
+        <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g — survey data</p>
+        <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
+          {{ nutrient_row("Energy (kcal)", row.energy_kcal, "%.1f") }}
+          {{ nutrient_row("Protein (g)", row.protein_g) }}
+          {{ nutrient_row("Fat (g)", row.fat_g) }}
+          {{ nutrient_row("Carbohydrates (g)", row.carbohydrates_g) }}
+          {{ nutrient_row("Fiber (g)", row.fiber_g) }}
+          {{ nutrient_row("Sodium (mg)", row.sodium_mg) }}
+        </tbody></table>
+      </div>
+      {% endfor %}
+
+      {% for row in usda_cooking_yield_rows %}
+      <div class="ref-panel" id="panel-usdacy-{{ loop.index0 }}" style="display:none">
+        <h3 style="margin-top:0">{{ row.food_description }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· USDA Cooking Yields · {{ row.cooking_description }}</small></h3>
+        <table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody>
+          <tr><td>Yield %</td><td>{{ "%.1f"|format(row.cooking_yield_pct) }}</td></tr>
+          <tr><td>Moisture Δ%</td><td>{{ "%+.1f"|format(row.moisture_change_pct) if row.moisture_change_pct is not none else "—" }}</td></tr>
+          <tr><td>Fat Δ%</td><td>{{ "%+.1f"|format(row.fat_change_pct) if row.fat_change_pct is not none else "—" }}</td></tr>
+        </tbody></table>
+      </div>
+      {% endfor %}
+
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+  function selectRef(panelId) {
+    document.querySelectorAll('.ref-panel').forEach(p => p.style.display = 'none');
+    document.querySelectorAll('.ref-btn').forEach(b => b.style.background = '');
+    document.getElementById('ref-placeholder').style.display = 'none';
+    const panel = document.getElementById('panel-' + panelId);
+    if (panel) panel.style.display = 'block';
+    const btn = document.getElementById('btn-' + panelId);
+    if (btn) btn.style.background = '#e2ecdf';
+  }
+
+  const firstBtn = document.querySelector('.ref-btn');
+  if (firstBtn) firstBtn.click();
+</script>
+{% endblock %}

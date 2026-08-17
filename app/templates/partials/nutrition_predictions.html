@@ -1,0 +1,82 @@
+<div class="card">
+  <h2>Nutritional predictions <small style="color:#888;font-size:0.75rem;font-weight:normal">(per 100 g · raw input → cooked output)</small></h2>
+
+  {% if not methods %}
+  <p style="color:#888">No cooking methods defined for this ingredient. Add cooking relationships or set <em>can eat raw</em> to enable predictions.</p>
+
+  {% elif not results %}
+  <p style="color:#c0392b">No results — check that <code>pocket-nutrition-api</code> is reachable.</p>
+
+  {% else %}
+  <div style="overflow-x:auto">
+    <table>
+      <thead>
+        <tr>
+          <th>Nutrient</th>
+          {% for method in methods %}
+          <th style="text-transform:capitalize">{{ method }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% set rows = [
+          ("Energy", "energyKcal", "kcal"),
+          ("Protein", "proteinG", "g"),
+          ("Fat", "fatG", "g"),
+          ("Carbs", "carbohydratesG", "g"),
+          ("Fiber", "fiberG", "g"),
+        ] %}
+        {% for label, field, unit in rows %}
+        <tr>
+          <td><strong>{{ label }}</strong> <span style="color:#aaa;font-size:0.8rem">{{ unit }}</span></td>
+          {% for method in methods %}
+            {% set r = results.get(method) %}
+            {% if r is string %}
+            <td style="color:#c0392b;font-size:0.8rem" title="{{ r }}">error</td>
+            {% elif not r or r.get("available") == false %}
+            <td style="color:#aaa">—</td>
+            {% else %}
+              {% set val = r.get(field) %}
+              <td>{% if val is not none %}{{ "%.1f"|format(val) }}{% else %}—{% endif %}</td>
+            {% endif %}
+          {% endfor %}
+        </tr>
+        {% endfor %}
+        <tr style="border-top:2px solid #e5e5e5">
+          <td><strong>Confidence</strong></td>
+          {% for method in methods %}
+            {% set r = results.get(method) %}
+            {% if r is string or not r or r.get("available") == false %}
+            <td style="color:#aaa">—</td>
+            {% else %}
+              {% set conf = r.get("confidence") %}
+              {% if conf is not none %}
+                {% if conf >= 0.8 %}
+                  <td style="color:#27ae60">{{ "%.0f"|format(conf * 100) }}%</td>
+                {% elif conf >= 0.6 %}
+                  <td style="color:#e67e22">{{ "%.0f"|format(conf * 100) }}%</td>
+                {% else %}
+                  <td style="color:#c0392b">{{ "%.0f"|format(conf * 100) }}%</td>
+                {% endif %}
+              {% else %}
+              <td>—</td>
+              {% endif %}
+            {% endif %}
+          {% endfor %}
+        </tr>
+        <tr>
+          <td><strong>Source</strong></td>
+          {% for method in methods %}
+            {% set r = results.get(method) %}
+            {% if r is string or not r %}
+            <td style="color:#aaa">—</td>
+            {% else %}
+            <td style="color:#888;font-size:0.8rem">{{ r.get("source") or "—" }}</td>
+            {% endif %}
+          {% endfor %}
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>

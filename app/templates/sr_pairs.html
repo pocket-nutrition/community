@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}USDA SR Pairs — Food Dataset · Pocket Nutrition{% endblock %}
+{% block content %}
+<h1>USDA SR raw/cooked pairs
+  <span style="font-size:1rem;font-weight:400;color:#888">({{ total }} pending)</span>
+</h1>
+
+<div class="info-box">
+  <strong>What is this page for?</strong>
+  These are USDA SR Legacy raw foods that the automatic matcher could not link to any canonical ingredient.
+  Each row shows the raw food, its cooked variants, and the computed yield factors.
+  This page is <strong>read-only</strong> — linking a raw food to a canonical ingredient happens
+  via the <code>pocket-nutrition-knowledge-editor</code> tool, which commits the resulting
+  <code>source_mappings/usda_sr/</code> and <code>cooking_relationships/</code> entries.
+</div>
+
+{% if total == 0 %}
+<div class="card" style="color:#27ae60;text-align:center;padding:2rem;">
+  &#10003; No pending USDA SR pairs.
+</div>
+{% else %}
+
+<div style="margin-bottom:0.75rem;font-size:0.85rem;color:#666;">
+  Showing {{ page_start }}–{{ page_end }} of {{ total }}
+</div>
+
+<div class="card" style="padding:0">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40%">Raw food (USDA SR)</th>
+        <th style="width:10%">kcal/100g</th>
+        <th style="width:50%">Cooked variants &amp; yields</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for pair in pairs %}
+      {% set safe_id = pair.raw_fdc_id | replace("/","_") | replace("..","_") %}
+      <tr id="sr-pair-row-{{ safe_id }}">
+        <td>
+          <div style="font-size:0.85rem;font-weight:500;">{{ pair.raw_description }}</div>
+          <div style="font-size:0.75rem;color:#888;margin-top:0.2rem;">FDC {{ pair.raw_fdc_id }}</div>
+        </td>
+        <td style="font-size:0.85rem;">{{ "%.0f"|format(pair.raw_kcal) }}</td>
+        <td>
+          <div style="display:flex;flex-direction:column;gap:0.25rem;">
+            {% for v in pair.cooked_variants %}
+            <div style="font-size:0.75rem;">
+              <span class="badge badge-method-{{ v.method }}">{{ v.method }}</span>
+              <span style="color:#555;margin-left:0.3rem;">×{{ v.yield_factor }}</span>
+              <span style="color:#999;margin-left:0.3rem;">{{ "%.0f"|format(v.kcal) }} kcal</span>
+            </div>
+            {% endfor %}
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<div style="display:flex;gap:0.5rem;margin-top:1rem;align-items:center;font-size:0.85rem;">
+  {% if page > 1 %}
+  <a href="/ui/sr-pairs?page={{ page - 1 }}" class="btn" style="padding:0.35rem 0.8rem;">&#8592; Prev</a>
+  {% endif %}
+  <span style="color:#666;">Page {{ page }} / {{ total_pages }}</span>
+  {% if page < total_pages %}
+  <a href="/ui/sr-pairs?page={{ page + 1 }}" class="btn" style="padding:0.35rem 0.8rem;">Next &#8594;</a>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endif %}
+{% endblock %}

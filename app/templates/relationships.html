@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Cooking Relationships — Food Dataset · Pocket Nutrition{% endblock %}
+{% block content %}
+<h1>Cooking Relationships ({{ relationships | length }})</h1>
+
+<div class="info-box">
+  <strong>What is a cooking relationship?</strong>
+  A cooking relationship links a <strong>raw ingredient</strong> to a <strong>cooking method</strong>
+  (boiled, grilled, steamed…) and records two key values:
+  <br><br>
+  • <strong>Yield factor</strong>: the mass ratio of the cooked product to 100 g raw.
+  A value of <code>0.750</code> means 100 g raw → 75 g cooked (water lost during cooking).
+  A value above <code>1.000</code> means the ingredient absorbs liquid (e.g. rice, pasta).
+  <br>
+  • <strong>Confidence</strong> (0–1): how reliable the value is. Values close to <code>1.0</code> come from
+  official food composition tables (Ciqual, USDA); lower values are community estimates.
+  <br><br>
+  The ML service uses these relationships to convert raw nutritional profiles into post-cooking predictions.
+</div>
+
+<div class="card">
+  <table>
+    <thead>
+      <tr><th>Ingredient</th><th>Method</th><th>Yield factor</th><th>Confidence</th><th>Source</th></tr>
+    </thead>
+    <tbody>
+      {% for rel in relationships %}
+      <tr>
+        <td><a class="link" href="/ui/ingredients/{{ rel.raw_id }}">{{ rel.raw_id }}</a></td>
+        <td>{{ rel.cooking_method }}</td>
+        <td>{{ "%.3f"|format(rel.yield_factor) }}</td>
+        <td>{{ "%.2f"|format(rel.confidence) if rel.confidence else "—" }}</td>
+        <td>{{ rel.source or "—" }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" style="color:#888;padding:1rem">No relationships yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

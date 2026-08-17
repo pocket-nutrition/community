@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Ingredients — Food Dataset · Pocket Nutrition{% endblock %}
+{% block content %}
+<h1>Ingredients ({{ total }})</h1>
+
+<div class="info-box">
+  <strong>What is an ingredient?</strong>
+  An ingredient is a canonical food item in the knowledge base — for example <code>chicken_breast</code> or <code>brown_rice</code>.
+  Each ingredient has a unique <strong>slug ID</strong> (lowercase letters and underscores), a <strong>food group</strong>
+  (meat, vegetable, cereal…) and a <strong>state</strong> indicating whether the reference values are for the
+  <em>raw</em>, <em>cooked</em>, or <em>processed</em> form.
+  Ingredients are the building blocks used by the ML service: raw nutritional profiles are looked up by ingredient ID
+  and then transformed by cooking relationships. Click any row to see details and linked relationships.
+</div>
+
+<div class="search-bar">
+  <input type="search" placeholder="Search by name or ID…"
+         hx-get="/ui/ingredients/search"
+         hx-trigger="keyup changed delay:300ms"
+         hx-target="#ingredient-table"
+         name="q">
+</div>
+
+<div class="filters">
+  {% for group in ["meat", "fish", "shellfish", "vegetable", "fruit", "legume", "cereal", "dairy", "beverage", "egg", "fat", "nut_seed", "spice_herb", "sweetener", "baked_good", "sauce", "processed_meat", "prepared_dish", "seaweed", "alcohol", "other"] %}
+  <button class="filter-btn"
+          hx-get="/ui/ingredients/search?group={{ group }}"
+          hx-target="#ingredient-table">{{ group }}</button>
+  {% endfor %}
+  <button class="filter-btn active"
+          hx-get="/ui/ingredients/search"
+          hx-target="#ingredient-table">all</button>
+</div>
+
+<div class="card">
+  <div id="ingredient-table">
+    {% include "partials/ingredient_rows.html" %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Food Dataset · Pocket Nutrition{% endblock %}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥕</text></svg>">
+  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <style>
+    :root {
+      --paper: #faf7f0; --cream: #f1ead9; --ink: #1e2b22; --ink-soft: #4a5a4e;
+      --leaf: #3e7a4e; --leaf-deep: #1f3d29; --carrot: #e07a2f; --carrot-soft: #f7e3cf;
+      --ok: #3e7a4e; --ok-soft: #e2ecdf; --warn: #c9862e; --warn-soft: #f6e8cf;
+      --bad: #b0402f; --bad-soft: #f4ddd7; --sea: #3d6a7a; --sea-soft: #dde9ec;
+      --gold: #b08a2e; --gold-soft: #f2e9d0; --plum: #7a4a66; --plum-soft: #ecdfe7;
+      --line: rgba(30,43,34,.14);
+      --font-display: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Georgia, serif;
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+      --radius: 18px; --radius-sm: 10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font-body); color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; }
+
+    nav { background: rgba(250,247,240,.92); border-bottom: 1px solid var(--line); padding: 0.9rem 2rem; display: flex; gap: 1.6rem; align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 10; backdrop-filter: blur(8px); }
+    nav a { color: var(--ink-soft); text-decoration: none; font-size: 0.85rem; font-weight: 500; }
+    nav a.nav-highlight { color: var(--leaf-deep); font-weight: 700; border-bottom: 2px solid var(--carrot); padding-bottom: 0.15rem; }
+    nav a:hover { color: var(--leaf-deep); }
+    nav .brand { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; color: var(--ink); text-decoration: none; margin-right: 0.5rem; }
+    nav .brand .mark { color: var(--carrot); }
+    nav .brand small { font-family: var(--font-body); font-size: 0.68rem; font-weight: 600; color: var(--ink-soft); margin-left: 0.45rem; letter-spacing: 0.1em; text-transform: uppercase; }
+
+    main { max-width: 1100px; margin: 2.25rem auto 3.5rem; padding: 0 1.5rem; }
+    h1 { font-family: var(--font-display); font-weight: 500; font-size: 2rem; margin-bottom: 1rem; }
+    h2 { font-family: var(--font-display); font-weight: 500; font-size: 1.2rem; margin-bottom: 0.75rem; }
+    h3 { font-family: var(--font-display); font-weight: 500; }
+
+    .card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.25rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
+    th { background: rgba(241,234,217,.5); color: var(--ink-soft); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; padding: 0.65rem 0.8rem; text-align: left; border-bottom: 1px solid var(--line); }
+    td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line); }
+    tr:hover td { background: rgba(62,122,78,.05); }
+    code { font-family: var(--font-mono); font-size: 0.82em; color: var(--leaf-deep); }
+
+    input, select, textarea { width: 100%; padding: 0.55rem 0.8rem; border: 1px solid var(--line); border-radius: var(--radius-sm); font-size: 0.9rem; font-family: var(--font-body); color: var(--ink); background: #fff; }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--leaf); box-shadow: 0 0 0 3px rgba(62,122,78,.18); }
+    button.btn, a.btn { background: var(--leaf-deep); color: var(--paper); border: none; padding: 0.6rem 1.4rem; border-radius: 999px; cursor: pointer; font-size: 0.88rem; font-weight: 600; }
+    button.btn:hover, a.btn:hover { background: var(--leaf); }
+
+    .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+    .badge-meat { background: var(--bad-soft); color: #7c2d20; }
+    .badge-fish { background: var(--sea-soft); color: #274b58; }
+    .badge-shellfish { background: var(--sea-soft); color: #274b58; }
+    .badge-vegetable { background: var(--ok-soft); color: var(--leaf-deep); }
+    .badge-fruit { background: var(--plum-soft); color: #55304a; }
+    .badge-legume { background: var(--ok-soft); color: #2c5237; }
+    .badge-cereal { background: var(--gold-soft); color: #6e5518; }
+    .badge-dairy { background: var(--cream); color: var(--ink-soft); }
+    .badge-egg { background: var(--gold-soft); color: #6e5518; }
+    .badge-fat { background: var(--warn-soft); color: #7a5116; }
+    .badge-nut_seed { background: var(--carrot-soft); color: #8a4a17; }
+    .badge-spice_herb { background: var(--carrot-soft); color: #8a4a17; }
+    .badge-sweetener { background: var(--plum-soft); color: #55304a; }
+    .badge-baked_good { background: var(--warn-soft); color: #7a5116; }
+    .badge-beverage { background: var(--sea-soft); color: #274b58; }
+    .badge-sauce { background: var(--bad-soft); color: #7c2d20; }
+    .badge-processed_meat { background: var(--bad-soft); color: #7c2d12; }
+    .badge-prepared_dish { background: var(--cream); color: var(--ink-soft); }
+    .badge-seaweed { background: var(--sea-soft); color: #0f5e56; }
+    .badge-alcohol { background: var(--plum-soft); color: #55304a; }
+    .badge-other { background: var(--cream); color: var(--ink-soft); }
+    .badge-ciqual { background: var(--gold-soft); color: #6e5518; }
+    .badge-mccance { background: var(--plum-soft); color: #55304a; }
+    .badge-usda { background: var(--sea-soft); color: #274b58; }
+    .badge-unlinked { background: transparent; color: #7a5116; border: 1.5px dashed var(--warn); }
+    .badge-method-raw     { background: var(--cream); color: var(--ink-soft); }
+    .badge-method-cooked  { background: var(--carrot-soft); color: #8a4a17; }
+    .badge-method-boiled  { background: var(--sea-soft); color: #274b58; }
+    .badge-method-steamed { background: var(--sea-soft); color: #0f5e56; }
+    .badge-method-grilled { background: var(--bad-soft); color: #7c2d20; }
+    .badge-method-roasted { background: var(--cream); color: var(--ink-soft); }
+    .badge-method-fried   { background: var(--warn-soft); color: #7a5116; }
+
+    .search-bar { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
+    .search-bar input { flex: 1; }
+    .filters { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+    .filter-btn { padding: 0.35rem 0.85rem; border-radius: 999px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--ink-soft); }
+    .filter-btn:hover { border-color: var(--leaf); color: var(--leaf-deep); }
+    .filter-btn.active { background: var(--leaf-deep); color: var(--paper); border-color: var(--leaf-deep); }
+    a.link { color: var(--leaf-deep); text-decoration: none; font-weight: 600; }
+    a.link:hover { color: var(--carrot); text-decoration: underline; }
+
+    .proposal-form { max-width: 540px; }
+    .form-group { margin-bottom: 1rem; }
+    .form-group label { display: block; margin-bottom: 0.3rem; font-size: 0.85rem; font-weight: 600; }
+    .success-msg { color: var(--leaf-deep); background: var(--ok-soft); padding: 0.8rem 1rem; border-radius: var(--radius-sm); }
+    .error-msg { color: #7c2d20; background: var(--bad-soft); padding: 0.8rem 1rem; border-radius: var(--radius-sm); }
+    .htmx-indicator { display: none; }
+    .htmx-request .htmx-indicator { display: inline; }
+    .htmx-request.htmx-indicator { display: inline; }
+    .info-box { background: var(--cream); border-left: 4px solid var(--leaf); padding: 1rem 1.3rem; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: 1.5rem; font-size: 0.88rem; color: var(--ink-soft); line-height: 1.65; }
+    .info-box strong { color: var(--ink); }
+    .info-box code { background: rgba(255,255,255,.7); border: 1px solid var(--line); padding: 0.08rem 0.35rem; border-radius: 5px; font-size: 0.8rem; }
+    .field-help { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.25rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <a class="brand" href="/ui/dashboard">pocket<span class="mark">·</span>nutrition<small>Food Dataset</small></a>
+    <a href="/ui/dashboard" {% if request.url.path == '/ui/dashboard' %}class="nav-highlight"{% endif %}>Dashboard</a>
+    <a href="/ui/ingredients" {% if request.url.path.startswith('/ui/ingredients') %}class="nav-highlight"{% endif %}>Ingredients</a>
+    <a href="/ui/relationships" {% if request.url.path.startswith('/ui/relationships') %}class="nav-highlight"{% endif %}>Relationships</a>
+    <a href="/ui/sr-pairs" {% if request.url.path.startswith('/ui/sr-pairs') %}class="nav-highlight"{% endif %}>SR Pairs</a>
+    <a href="/ui/feedback" {% if request.url.path.startswith('/ui/feedback') %}class="nav-highlight"{% endif %}>Feedback</a>
+    <span style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;">
+      <a href="https://pocketnutrition.org" style="font-size:0.78rem;">pocketnutrition.org ↗</a>
+      <span id="cache-msg"></span>
+      <button class="btn" style="padding:0.35rem 0.9rem;font-size:0.8rem;background:transparent;color:var(--leaf-deep);border:1.5px solid var(--leaf-deep);"
+              hx-post="/ui/reload"
+              hx-target="#cache-msg"
+              hx-swap="outerHTML"
+              hx-indicator="#reload-spinner"
+              hx-confirm="Reload all data from GitHub? This takes ~20 seconds.">
+        ⟳ Reload
+      </button>
+      <span id="reload-spinner" class="htmx-indicator" style="font-size:0.8rem;color:var(--ink-soft);">⟳ Loading…</span>
+    </span>
+  </nav>
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>
