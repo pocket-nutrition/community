@@ -23,9 +23,9 @@ from app.search import search_ingredients
 router = APIRouter(prefix="/ui", tags=["ui"])
 templates = Jinja2Templates(directory="app/templates", context_processors=[i18n_context])
 
-# The Knowledge Editor install guide lives in the website's documentation, so there is one
-# version of it; /ui/knowledge-editor stays as a redirect for older links.
-KNOWLEDGE_EDITOR_GUIDE_URL = "https://website.pocketnutrition.org/docs/contribute/knowledge-editor"
+# The Knowledge Editor install steps live in its repository README; /ui/knowledge-editor stays
+# as a redirect for older links.
+KNOWLEDGE_EDITOR_GUIDE_URL = "https://github.com/pocket-nutrition/knowledge-editor"
 templates.env.globals["knowledge_editor_guide_url"] = KNOWLEDGE_EDITOR_GUIDE_URL
 
 _ONE_YEAR = 365 * 24 * 3600

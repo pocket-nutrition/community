@@ -44,14 +44,15 @@ def test_group_bar_lists_every_site_and_marks_the_food_dataset(client):
     html = client.get("/ui/ingredients").text
     group_bar = html.split('aria-label="Pocket Nutrition sites">')[1].split("</nav>")[0]
     assert 'href="/ui/ingredients" aria-current="true">Food Dataset' in group_bar
-    for site in ("Website", "Docs", "API", "GitHub"):
+    for site in ("Website", "API", "GitHub"):
         assert site in group_bar
+    assert "Docs" not in group_bar
 
 
-def test_knowledge_editor_page_redirects_to_the_docs_guide(client):
+def test_knowledge_editor_page_redirects_to_its_repository(client):
     r = client.get("/ui/knowledge-editor", follow_redirects=False)
     assert r.status_code == 301
-    assert r.headers["location"] == "https://website.pocketnutrition.org/docs/contribute/knowledge-editor"
+    assert r.headers["location"] == "https://github.com/pocket-nutrition/knowledge-editor"
 
 
 def test_relationships_ui_page_removed(client):
