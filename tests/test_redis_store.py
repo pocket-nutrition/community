@@ -69,13 +69,34 @@ def test_set_unlinked_mapping(fake_redis):
     assert total == 1
 
 
-def test_link_mapping_removes_from_unlinked(fake_redis):
-    redis_store.set_mapping({"source": "ciqual", "source_id": "12345", "label": "Poulet rôti"})
-    redis_store.link_mapping_in_redis("ciqual", "12345", "chicken_breast", "manual", 1.0, None)
+def test_linked_mapping_not_in_unlinked(fake_redis):
+    redis_store.set_mapping({
+        "source": "ciqual", "source_id": "12345", "label": "Poulet rôti",
+        "canonical_ingredient_id": "chicken_breast",
+    })
     _, total = redis_store.list_unlinked_mappings()
     assert total == 0
     linked = redis_store.get_mapping("ciqual", "12345")
     assert linked["canonical_ingredient_id"] == "chicken_breast"
+
+
+def test_list_mappings_for_ingredient(fake_redis):
+    redis_store.set_mapping({
+        "source": "ciqual", "source_id": "2", "label": "Poulet, cuit",
+        "canonical_ingredient_id": "chicken_breast", "match_method": "manual", "confidence": 1.0,
+    })
+    redis_store.set_mapping({
+        "source": "ciqual", "source_id": "1", "label": "Poulet, cru",
+        "canonical_ingredient_id": "chicken_breast",
+    })
+    redis_store.set_mapping({
+        "source": "ciqual", "source_id": "3", "label": "Brocoli",
+        "canonical_ingredient_id": "broccoli",
+    })
+    mappings = redis_store.list_mappings_for_ingredient("ciqual", "chicken_breast")
+    assert [m["source_id"] for m in mappings] == ["1", "2"]
+    assert mappings[1]["match_method"] == "manual"
+    assert redis_store.list_mappings_for_ingredient("usda", "chicken_breast") == []
 
 
 def test_list_unlinked_mappings_pagination(fake_redis):
@@ -89,9 +110,8 @@ def test_list_unlinked_mappings_pagination(fake_redis):
 def test_get_dashboard_stats(fake_redis):
     redis_store.set_ingredient("chicken_breast", {**_CHICKEN, "name_fr": "Blanc de poulet"})
     redis_store.set_ingredient("broccoli", _BROCCOLI)
-    redis_store.set_mapping({"source": "ciqual", "source_id": "1", "label": "Poulet"})
+    redis_store.set_mapping({"source": "ciqual", "source_id": "1", "label": "Poulet", "canonical_ingredient_id": "chicken_breast"})
     redis_store.set_mapping({"source": "ciqual", "source_id": "2", "label": "Composite", "canonical_ingredient_id": "_composite"})
-    redis_store.link_mapping_in_redis("ciqual", "1", "chicken_breast", "manual", 1.0, None)
     redis_store.set_relationship("chicken_breast", "grilled", {"raw_id": "chicken_breast", "cooking_method": "grilled", "yield_factor": 0.75})
 
     stats = redis_store.get_dashboard_stats()

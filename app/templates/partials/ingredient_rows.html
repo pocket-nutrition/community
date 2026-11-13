@@ -1,34 +1,58 @@
+{% macro score_bar(c) %}
+{%- set color = "var(--ok)" if c.overall >= 70 else ("var(--warn)" if c.overall >= 40 else "var(--bad)") -%}
+<span class="conf" title="{{ t.dim_profile }}: {{ c.profile }}% · {{ t.dim_sources }}: {{ c.sources }}% · {{ t.dim_cooking }}: {{ c.cooking }}%"><span style="width:{{ c.overall }}%;background:{{ color }}"></span></span><span style="font-size:0.8rem;color:var(--ink-soft)">{{ c.overall }}%</span>
+{% endmacro %}
+{% macro sources_cell(c) %}
+{%- if c.mapping_count == 0 -%}
+<span style="color:#aaa;font-size:0.82rem">{{ t.sources_none }}</span>
+{%- elif c.verified_mapping_count >= 1 -%}
+<span style="font-weight:600">{{ c.mapping_count }}</span> <span class="src-verified">✓ {{ t.sources_verified }}</span>
+{%- else -%}
+<span style="font-weight:600">{{ c.mapping_count }}</span> <span class="src-unverified">{{ t.sources_unverified }}</span>
+{%- endif -%}
+{% endmacro %}
 <table>
   <thead>
-    <tr><th>ID</th><th>EN</th><th>FR</th><th>Group</th><th>State</th><th></th></tr>
+    <tr><th>{{ t.col_ingredient }}</th><th>{{ t.col_id }}</th><th>{{ t.col_group }}</th><th>{{ t.col_state }}</th><th>{{ t.col_data_confidence }}</th><th>{{ t.col_sources }}</th></tr>
   </thead>
   <tbody>
     {% for ing in ingredients %}
-    <tr>
-      <td><code>{{ ing.id }}</code></td>
-      <td>{{ ing.name_en }}</td>
-      <td>{{ ing.name_fr or "—" }}</td>
-      <td><span class="badge badge-{{ ing.food_group }}">{{ ing.food_group }}</span></td>
-      <td>{{ ing.states.keys() | join(', ') }}</td>
-      <td><a class="link" href="/ui/ingredients/{{ ing.id }}">detail →</a></td>
+    {% if lang == 'fr' and ing.name_fr %}
+      {% set primary_name, secondary_name = ing.name_fr, ing.name_en %}
+    {% else %}
+      {% set primary_name, secondary_name = ing.name_en, ing.name_fr %}
+    {% endif %}
+    {% set c = completeness[ing.id] %}
+    <tr class="clickable" onclick="window.location='/ui/ingredients/{{ ing.id }}'">
+      <td>
+        <a class="link cap" href="/ui/ingredients/{{ ing.id }}">{{ primary_name }}</a>
+        {% if secondary_name and secondary_name != primary_name %}
+        <span class="cap" style="display:block;font-size:0.8rem;color:var(--ink-soft)">{{ secondary_name }}</span>
+        {% endif %}
+      </td>
+      <td><code style="color:var(--ink-soft)">{{ ing.id }}</code></td>
+      <td><span class="badge badge-{{ ing.food_group }}">{{ t.groups.get(ing.food_group, ing.food_group) }}</span></td>
+      <td style="color:var(--ink-soft)">{% for s in ing.states.keys() %}{{ t.states.get(s, s) }}{% if not loop.last %}, {% endif %}{% endfor %}</td>
+      <td>{{ score_bar(c) }}</td>
+      <td>{{ sources_cell(c) }}</td>
     </tr>
     {% else %}
-    <tr><td colspan="6" style="color:#888;padding:1rem">No ingredients found.</td></tr>
+    <tr><td colspan="6" style="color:#888;padding:1rem">{% if q %}{{ t.empty_search }}{% else %}{{ t.empty_none }}{% endif %}</td></tr>
     {% endfor %}
   </tbody>
 </table>
 {% if total_pages > 1 %}
 <div class="pagination">
-  <span class="pagination-info">{{ page_start }}–{{ page_end }} of {{ total }}</span>
+  <span class="pagination-info">{{ page_start }}–{{ page_end }} {{ t.of }} {{ total }}</span>
   {% if page > 1 %}
   <button class="btn-page"
-          hx-get="/ui/ingredients/search?q={{ q }}&group={{ group }}&page={{ page - 1 }}"
-          hx-target="#ingredient-table">← Prev</button>
+          hx-get="/ui/ingredients/search?q={{ q|urlencode }}&group={{ group }}&sort={{ sort }}&page={{ page - 1 }}"
+          hx-target="#ingredient-table">{{ t.prev }}</button>
   {% endif %}
   {% if page < total_pages %}
   <button class="btn-page"
-          hx-get="/ui/ingredients/search?q={{ q }}&group={{ group }}&page={{ page + 1 }}"
-          hx-target="#ingredient-table">Next →</button>
+          hx-get="/ui/ingredients/search?q={{ q|urlencode }}&group={{ group }}&sort={{ sort }}&page={{ page + 1 }}"
+          hx-target="#ingredient-table">{{ t.next }}</button>
   {% endif %}
 </div>
 {% endif %}

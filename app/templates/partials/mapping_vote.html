@@ -1,0 +1,2 @@
+{% import "partials/_mapping_vote_widget.html" as vote_widget with context %}
+{{ vote_widget.mapping_vote_widget(ingredient_id, source, source_id, cooking_method, votes, locked=ok, error=none if ok else t.mapping_vote_error, dom_suffix=dom_suffix) }}

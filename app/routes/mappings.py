@@ -1,4 +1,4 @@
-"""Read-only mappings API — lists source mappings not yet linked to a canonical ingredient."""
+"""Read-only mappings API — used by curation tooling to list unlinked entries."""
 from __future__ import annotations
 
 from fastapi import APIRouter

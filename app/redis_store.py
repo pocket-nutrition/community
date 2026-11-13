@@ -17,6 +17,7 @@ from typing import Any
 
 import redis as _redis
 
+from app.completeness import SOURCES, MappingTally, is_verified_mapping
 from app.config import settings
 
 _pool = _redis.ConnectionPool.from_url(settings.redis_url, decode_responses=True)
@@ -58,6 +59,21 @@ def list_ingredient_keys() -> list[str]:
 
 def list_slugs_by_group(food_group: str) -> list[str]:
     return sorted(_r().smembers(f"knowledge:index:food_group:{food_group}"))
+
+
+def count_ingredients_by_group() -> dict[str, int]:
+    """Return {food_group: ingredient count} from the food-group indexes."""
+    r = _r()
+    counts: dict[str, int] = {}
+    cursor = 0
+    while True:
+        cursor, batch = r.scan(cursor, match="knowledge:index:food_group:*", count=100)
+        for key in batch:
+            group = key.removeprefix("knowledge:index:food_group:")
+            counts[group] = r.scard(key)
+        if cursor == 0:
+            break
+    return counts
 
 
 def mget_ingredients(slugs: list[str]) -> list[dict[str, Any]]:
@@ -135,45 +151,20 @@ def list_unlinked_mappings(
     return page, total
 
 
-def link_mapping_in_redis(
-    source: str,
-    source_id: str,
-    canonical_id: str,
-    match_method: str,
-    confidence: float,
-    notes: str | None,
-) -> dict[str, Any]:
-    existing = get_mapping(source, source_id) or {}
-    updated = {
-        **existing,
-        "source": source,
-        "source_id": source_id,
-        "canonical_ingredient_id": canonical_id,
-        "match_method": match_method,
-        "confidence": confidence,
-    }
-    if notes is not None:
-        updated["notes"] = notes
-    r = _r()
-    pipe = r.pipeline()
-    pipe.set(f"knowledge:mapping:{source}:{source_id}", json.dumps(updated))
-    pipe.srem("knowledge:index:mapping:unlinked", f"{source}:{source_id}")
-    pipe.execute()
-    return updated
-
-
-def list_source_ids_for_ingredient(source: str, slug: str) -> list[str]:
-    """Return all source_ids for a given source that map to slug."""
+def list_mappings_for_ingredient(source: str, slug: str) -> list[dict[str, Any]]:
+    """Return the full mapping dicts for a given source that map to slug."""
     all_ids = list(_r().smembers(f"knowledge:index:mapping:by_source:{source}"))
     if not all_ids:
         return []
     keys = [f"knowledge:mapping:{source}:{sid}" for sid in all_ids]
     values = _r().mget(keys)
-    return [
-        json.loads(v)["source_id"]
+    mappings = [
+        data
         for v in values
-        if v and json.loads(v).get("canonical_ingredient_id") == slug
+        if v and (data := json.loads(v)).get("canonical_ingredient_id") == slug
     ]
+    mappings.sort(key=lambda m: m["source_id"])
+    return mappings
 
 
 def list_source_ids_for_ingredient_by_method(
@@ -225,6 +216,40 @@ def list_relationship_keys() -> list[tuple[str, str]]:
     return result
 
 
+def build_relationship_counts() -> dict[str, int]:
+    """Count cooking relationships per raw ingredient, for the data-confidence score."""
+    counts: dict[str, int] = {}
+    for raw_id, _method in list_relationship_keys():
+        counts[raw_id] = counts.get(raw_id, 0) + 1
+    return counts
+
+
+def build_mapping_tallies() -> dict[str, MappingTally]:
+    """Aggregate mapping count + verified count per canonical ingredient, across all sources.
+
+    Feeds the data-confidence score shown on the ingredient list and detail pages.
+    """
+    r = _r()
+    raw: dict[str, dict[str, int]] = {}
+    for source in SOURCES:
+        source_ids = r.smembers(f"knowledge:index:mapping:by_source:{source}")
+        if not source_ids:
+            continue
+        values = r.mget([f"knowledge:mapping:{source}:{sid}" for sid in source_ids])
+        for v in values:
+            if not v:
+                continue
+            data = json.loads(v)
+            cid = data.get("canonical_ingredient_id")
+            if not cid or cid == "_composite":
+                continue
+            entry = raw.setdefault(cid, {"total": 0, "verified": 0})
+            entry["total"] += 1
+            if is_verified_mapping(data):
+                entry["verified"] += 1
+    return {cid: MappingTally(total=v["total"], verified=v["verified"]) for cid, v in raw.items()}
+
+
 # ── Unit types ────────────────────────────────────────────────────────────────
 
 def set_unit_types(data: dict[str, float]) -> None:
@@ -234,37 +259,6 @@ def set_unit_types(data: dict[str, float]) -> None:
 def get_unit_types() -> dict[str, float]:
     raw = _r().get("knowledge:unit_types")
     return json.loads(raw) if raw else {}
-
-
-# ── USDA SR pending pairs ────────────────────────────────────────────────────
-
-def set_sr_pairs(pairs: list[dict[str, Any]]) -> None:
-    """Store all unmapped USDA SR pairs; keyed by raw_fdc_id for fast lookup."""
-    r = _r()
-    pipe = r.pipeline()
-    pipe.delete("knowledge:index:sr_pairs")
-    for pair in pairs:
-        fdc_id = pair.get("raw_fdc_id")
-        if not fdc_id:
-            continue
-        pipe.set(f"knowledge:sr_pair:{fdc_id}", json.dumps(pair))
-        pipe.sadd("knowledge:index:sr_pairs", fdc_id)
-    pipe.execute()
-
-
-def get_sr_pair(raw_fdc_id: str) -> dict[str, Any] | None:
-    raw = _r().get(f"knowledge:sr_pair:{raw_fdc_id}")
-    return json.loads(raw) if raw else None
-
-
-def list_sr_pairs(offset: int = 0, limit: int = 50) -> tuple[list[dict[str, Any]], int]:
-    """Return pending pairs that have not yet been linked (no usda_sr source_mapping exists)."""
-    all_ids = sorted(_r().smembers("knowledge:index:sr_pairs"))
-    pending = [fid for fid in all_ids if get_mapping("usda_sr", fid) is None]
-    total = len(pending)
-    page_ids = pending[offset: offset + limit]
-    pairs = [p for fid in page_ids if (p := get_sr_pair(fid))]
-    return pairs, total
 
 
 # ── Meta ──────────────────────────────────────────────────────────────────────

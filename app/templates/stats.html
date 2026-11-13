@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Dashboard — Food Dataset · Pocket Nutrition{% endblock %}
+{% block title %}Stats — Food Dataset · Pocket Nutrition{% endblock %}
 {% block content %}
 <style>
   .dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
@@ -21,11 +21,11 @@
   .section-title { font-size: 1rem; font-weight: 700; color: var(--ink); margin-bottom: 0.75rem; }
 </style>
 
-<h1>Dashboard</h1>
+<h1>Stats</h1>
 {% if stats.loaded_at %}
 <p class="dash-meta">Data loaded at {{ stats.loaded_at }}</p>
 {% else %}
-<p class="dash-meta" style="color:#c0392b;">Cache not loaded — click Reload.</p>
+<p class="dash-meta" style="color:#c0392b;">Cache not loaded yet — data is being refreshed.</p>
 {% endif %}
 
 <p class="section-title">Knowledge base</p>
@@ -143,10 +143,4 @@
   {% endfor %}
 </div>
 
-{% if stats.mappings.values() | selectattr('unlinked', 'gt', 0) | list %}
-<div class="info-box">
-  There are unmapped source entries — see <code>/api/mappings/unlinked</code> or the
-  <code>pocket-nutrition-knowledge-editor</code> tool to link them to canonical ingredients.
-</div>
-{% endif %}
 {% endblock %}

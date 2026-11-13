@@ -1,0 +1,23 @@
+{% macro relationship_vote_widget(ingredient_id, cooking_method, votes, locked=False, error=None, dom_suffix="") %}
+{%- set base_id = ingredient_id ~ '-' ~ cooking_method -%}
+{%- set dom_id = base_id ~ ('-' ~ dom_suffix if dom_suffix else '') -%}
+<span id="relationship-votes-{{ dom_id }}" class="mapping-votes" data-mapping-key="{{ base_id }}">
+  <span class="vote-pill">
+    <button type="button" class="vote-seg"{% if locked %} disabled{% endif %}
+      title="{{ t.relationship_vote_up_tip }}" aria-label="{{ t.relationship_vote_up_tip }}"
+      hx-post="/ui/ingredients/{{ ingredient_id }}/relationships/vote"
+      hx-vals='{"cooking_method": "{{ cooking_method }}", "direction": "up", "dom_suffix": "{{ dom_suffix }}"}'
+      hx-target="#relationship-votes-{{ dom_id }}" hx-swap="outerHTML"
+      hx-on:click="localStorage.setItem('voted-mapping-{{ base_id }}', '1')"
+    >👍 {{ votes.upvotes }}</button>
+    <button type="button" class="vote-seg"{% if locked %} disabled{% endif %}
+      title="{{ t.relationship_vote_down_tip }}" aria-label="{{ t.relationship_vote_down_tip }}"
+      hx-post="/ui/ingredients/{{ ingredient_id }}/relationships/vote"
+      hx-vals='{"cooking_method": "{{ cooking_method }}", "direction": "down", "dom_suffix": "{{ dom_suffix }}"}'
+      hx-target="#relationship-votes-{{ dom_id }}" hx-swap="outerHTML"
+      hx-on:click="localStorage.setItem('voted-mapping-{{ base_id }}', '1')"
+    >👎 {{ votes.downvotes }}</button>
+  </span>
+  {%- if error %}<span class="vote-btn-error">{{ error }}</span>{% endif -%}
+</span>
+{% endmacro %}

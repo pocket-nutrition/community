@@ -1,35 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Ingredients — Food Dataset · Pocket Nutrition{% endblock %}
+{% block title %}{{ t.list_title }} — Food Dataset · Pocket Nutrition{% endblock %}
 {% block content %}
-<h1>Ingredients ({{ total }})</h1>
-
-<div class="info-box">
-  <strong>What is an ingredient?</strong>
-  An ingredient is a canonical food item in the knowledge base — for example <code>chicken_breast</code> or <code>brown_rice</code>.
-  Each ingredient has a unique <strong>slug ID</strong> (lowercase letters and underscores), a <strong>food group</strong>
-  (meat, vegetable, cereal…) and a <strong>state</strong> indicating whether the reference values are for the
-  <em>raw</em>, <em>cooked</em>, or <em>processed</em> form.
-  Ingredients are the building blocks used by the ML service: raw nutritional profiles are looked up by ingredient ID
-  and then transformed by cooking relationships. Click any row to see details and linked relationships.
-</div>
+<h1>{{ t.list_title }}</h1>
+<p style="color:var(--ink-soft);font-size:0.95rem;margin-bottom:1.25rem;max-width:46rem;line-height:1.6">
+  {{ t.intro_before }} <strong>{{ total_all }}</strong> {{ t.intro_after }}
+</p>
 
 <div class="search-bar">
-  <input type="search" placeholder="Search by name or ID…"
+  <input type="search" name="q" value="{{ q or '' }}" autofocus
+         placeholder="{{ t.search_placeholder }}"
          hx-get="/ui/ingredients/search"
-         hx-trigger="keyup changed delay:300ms"
+         hx-trigger="input changed delay:200ms, search"
          hx-target="#ingredient-table"
-         name="q">
+         hx-include="#group-input, #sort-select">
+  <input type="hidden" id="group-input" name="group" value="{{ group or '' }}">
+  <select id="sort-select" name="sort" aria-label="{{ t.sort_label }}"
+          hx-get="/ui/ingredients/search"
+          hx-trigger="change"
+          hx-target="#ingredient-table"
+          hx-include="input[name=q], #group-input"
+          style="width:auto;flex:0 0 auto;">
+    <option value="name" {% if sort == 'name' %}selected{% endif %}>{{ t.sort_name }}</option>
+    <option value="confidence_desc" {% if sort == 'confidence_desc' %}selected{% endif %}>{{ t.sort_confidence_desc }}</option>
+    <option value="confidence_asc" {% if sort == 'confidence_asc' %}selected{% endif %}>{{ t.sort_confidence_asc }}</option>
+  </select>
 </div>
 
-<div class="filters">
-  {% for group in ["meat", "fish", "shellfish", "vegetable", "fruit", "legume", "cereal", "dairy", "beverage", "egg", "fat", "nut_seed", "spice_herb", "sweetener", "baked_good", "sauce", "processed_meat", "prepared_dish", "seaweed", "alcohol", "other"] %}
-  <button class="filter-btn"
-          hx-get="/ui/ingredients/search?group={{ group }}"
-          hx-target="#ingredient-table">{{ group }}</button>
-  {% endfor %}
-  <button class="filter-btn active"
+<div class="filters" id="group-filters">
+  {% for g in ["meat", "fish", "shellfish", "vegetable", "fruit", "legume", "cereal", "dairy", "beverage", "egg", "fat", "nut_seed", "spice_herb", "sweetener", "baked_good", "sauce", "processed_meat", "prepared_dish", "seaweed", "alcohol", "other"] %}
+  {% if group_counts.get(g) %}
+  <button class="filter-btn{% if group == g %} active{% endif %}"
+          data-group="{{ g }}"
           hx-get="/ui/ingredients/search"
-          hx-target="#ingredient-table">all</button>
+          hx-vals='{"group": "{{ g }}"}'
+          hx-include="input[name=q], #sort-select"
+          hx-target="#ingredient-table">{{ t.groups[g] }} <span class="filter-count">{{ group_counts[g] }}</span></button>
+  {% endif %}
+  {% endfor %}
+  <button class="filter-btn{% if not group %} active{% endif %}"
+          data-group=""
+          hx-get="/ui/ingredients/search"
+          hx-vals='{"group": ""}'
+          hx-include="input[name=q], #sort-select"
+          hx-target="#ingredient-table">{{ t.all_groups }} <span class="filter-count">{{ total_all }}</span></button>
 </div>
 
 <div class="card">
@@ -37,4 +50,15 @@
     {% include "partials/ingredient_rows.html" %}
   </div>
 </div>
+
+<script>
+  // Keep the hidden group input and the active pill in sync with the last
+  // clicked filter, so text searches keep the selected food group.
+  document.getElementById('group-filters').addEventListener('click', (e) => {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    document.getElementById('group-input').value = btn.dataset.group;
+    document.querySelectorAll('#group-filters .filter-btn').forEach(b => b.classList.toggle('active', b === btn));
+  });
+</script>
 {% endblock %}

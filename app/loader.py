@@ -47,7 +47,7 @@ def _aggregate_relationships(entries: list[dict]) -> dict:
 def reload() -> dict[str, int]:
     log.info("Reloading knowledge cache from GitHub (archive download)")
 
-    counts = {"ingredients": 0, "mappings": 0, "unlinked_mappings": 0, "relationships": 0, "recipes": 0, "errors": 0, "unit_types": 0, "sr_pairs": 0}
+    counts = {"ingredients": 0, "mappings": 0, "unlinked_mappings": 0, "relationships": 0, "recipes": 0, "errors": 0, "unit_types": 0}
 
     redis_store.flush()
 
@@ -61,12 +61,7 @@ def reload() -> dict[str, int]:
             counts["errors"] += 1
             continue
 
-        if path == "scripts/pending_sr_pairs.yaml":
-            if isinstance(data, list):
-                redis_store.set_sr_pairs(data)
-                counts["sr_pairs"] = len(data)
-
-        elif path == "serving_unit_types.yaml":
+        if path == "serving_unit_types.yaml":
             redis_store.set_unit_types(data)
             counts["unit_types"] += 1
 

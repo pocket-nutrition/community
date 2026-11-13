@@ -1,105 +1,194 @@
 {% extends "base.html" %}
+{% import "partials/_mapping_vote_widget.html" as vote_widget with context %}
+{% import "partials/_relationship_vote_widget.html" as rel_vote_widget with context %}
 {% block title %}{{ ingredient.id }} — Food Dataset · Pocket Nutrition{% endblock %}
 {% block content %}
-<h1>{{ ingredient.name_en }}</h1>
-<p style="color:#666;margin-bottom:1.5rem"><code>{{ ingredient.id }}</code> &nbsp;·&nbsp; {{ ingredient.food_group }} &nbsp;·&nbsp; {{ ingredient.states.keys() | join(', ') }}</p>
-
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
-  <div class="card" style="margin:0">
-    <h2>Details</h2>
-    <table>
-      <tr><td><strong>ID</strong></td><td><code>{{ ingredient.id }}</code></td></tr>
-      <tr><td><strong>English</strong></td><td>{{ ingredient.name_en }}</td></tr>
-      <tr><td><strong>French</strong></td><td>{{ ingredient.name_fr or "—" }}</td></tr>
-      <tr><td><strong>Food group</strong></td><td><span class="badge badge-{{ ingredient.food_group }}">{{ ingredient.food_group }}</span></td></tr>
-      <tr><td><strong>States</strong></td><td>{{ ingredient.states.keys() | join(', ') }}</td></tr>
-      {% if ingredient.notes %}<tr><td><strong>Notes</strong></td><td>{{ ingredient.notes }}</td></tr>{% endif %}
-    </table>
-  </div>
-
-  <div class="card" style="margin:0">
-    <h2>Consumption &amp; serving</h2>
-    <table>
-      <tr><td><strong>Typical preparation</strong></td><td>{{ ingredient.typical_state or "—" }}</td></tr>
-      <tr><td><strong>Can eat raw</strong></td><td>{% if ingredient.can_eat_raw is none %}—{% elif ingredient.can_eat_raw %}Yes{% else %}No{% endif %}</td></tr>
-      <tr><td><strong>Can be cooked</strong></td><td>{% if ingredient.can_eat_cooked is none %}—{% elif ingredient.can_eat_cooked %}Yes{% else %}No{% endif %}</td></tr>
-      {% for state_name, meta in ingredient.states.items() %}
-      <tr><td><strong>Portion ({{ state_name }})</strong></td><td>{% if meta.portion_g %}{{ meta.portion_g | int }} g{% else %}—{% endif %}</td></tr>
-      {% if meta.density_g_ml %}<tr><td><strong>Density ({{ state_name }})</strong></td><td>{{ "%.2f"|format(meta.density_g_ml) }} g/mL</td></tr>{% endif %}
+{% macro confidence_cell(conf) %}
+{%- if conf is none -%}
+<span style="color:#aaa">—</span>
+{%- else -%}
+{%- set pct = (conf * 100) | round | int -%}
+{%- set color = "#27ae60" if conf >= 0.8 else ("#e67e22" if conf >= 0.6 else "#c0392b") -%}
+<span class="conf" title="{{ pct }}% confidence"><span style="width:{{ pct }}%;background:{{ color }}"></span></span><span style="font-size:0.8rem;color:var(--ink-soft)">{{ pct }}%</span>
+{%- endif -%}
+{% endmacro %}
+{% macro data_confidence_bar(c) %}
+{%- set color = "var(--ok)" if c.overall >= 70 else ("var(--warn)" if c.overall >= 40 else "var(--bad)") -%}
+<span class="conf" style="width:80px" title="{{ t.dim_profile }}: {{ c.profile }}% · {{ t.dim_sources }}: {{ c.sources }}% · {{ t.dim_cooking }}: {{ c.cooking }}%"><span style="width:{{ c.overall }}%;background:{{ color }}"></span></span><span style="font-size:0.85rem;color:var(--ink-soft)">{{ c.overall }}%</span>
+{% endmacro %}
+{% macro help(text) %}<button type="button" class="help-tip" title="{{ text }}" aria-label="{{ text }}">?</button>{% endmacro %}
+{% macro flag(category, code, hint_value="", hint_unit="", tip=none) %}{% set tip = tip or t.feedback_flag_tip %}<button type="button" class="flag-btn" title="{{ tip }}" aria-label="{{ tip }}" onclick="openFeedback('{{ category }}', '{{ code }}', '{{ hint_value }}', '{{ hint_unit }}')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" y1="22" x2="4" y2="15"></line></svg></button>{% endmacro %}
+{% if lang == 'fr' and ingredient.name_fr %}
+  {% set primary_name, secondary_name = ingredient.name_fr, ingredient.name_en %}
+  {% set alias_list = ingredient.aliases_fr + ingredient.aliases_en %}
+{% else %}
+  {% set primary_name, secondary_name = ingredient.name_en, ingredient.name_fr %}
+  {% set alias_list = ingredient.aliases_en + ingredient.aliases_fr %}
+{% endif %}
+<div style="margin-bottom:1.75rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap">
+  <div>
+    <div style="display:flex;align-items:baseline;gap:0.2rem">
+      <h1 class="cap" style="margin-bottom:0.3rem">{{ primary_name }}</h1>{{ flag('identity', 'name_fr' if lang == 'fr' else 'name_en', primary_name) }}
+    </div>
+    {% if secondary_name and secondary_name != primary_name %}
+    <p class="cap" style="font-family:var(--font-display);font-size:1.15rem;color:var(--ink-soft);margin-bottom:0.6rem;display:block">{{ secondary_name }}</p>
+    {% endif %}
+    <p style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.45rem">
+      <span class="badge badge-{{ ingredient.food_group }}">{{ t.groups.get(ingredient.food_group, ingredient.food_group) }}</span>{{ flag('identity', 'food_group', t.groups.get(ingredient.food_group, ingredient.food_group)) }}
+      {% for state_name in ingredient.states.keys() %}
+      <span class="badge badge-method-{{ state_name }}">{{ t.states.get(state_name, state_name) }}</span>
       {% endfor %}
-    </table>
+      <code style="font-size:0.8rem;color:var(--ink-soft)">{{ ingredient.id }}</code>
+    </p>
+    {% if alias_list %}
+    <p style="font-size:0.85rem;color:var(--ink-soft)">{{ t.also_known_as }} {{ alias_list | join(', ') }}</p>
+    {% endif %}
+    {% if ingredient.notes %}<p style="font-size:0.85rem;color:var(--ink-soft);margin-top:0.3rem">{{ ingredient.notes }}</p>{% endif %}
   </div>
+  <button type="button" class="btn" style="background:var(--carrot);white-space:nowrap" onclick="openFeedback()">🚩 {{ t.feedback_cta }}</button>
 </div>
 
-{% if relationships %}
+<div class="ingredient-layout">
+<aside class="sidebar">
 <div class="card">
-  <h2>Cooking relationships</h2>
+  <h2>{{ t.at_a_glance }}</h2>
   <table>
-    <thead><tr><th>Method</th><th>Yield factor</th><th>Confidence</th><th>Source</th></tr></thead>
-    <tbody>
-      {% for rel in relationships %}
-      <tr>
-        <td>{{ rel.cooking_method }}</td>
-        <td>{{ "%.3f"|format(rel.yield_factor) }}</td>
-        <td>{{ "%.2f"|format(rel.confidence) if rel.confidence else "—" }}</td>
-        <td>{{ rel.source or "—" }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
+    <tr><td><strong>{{ t.col_data_confidence }}</strong>{{ help(t.help_data_confidence) }}</td><td>{{ data_confidence_bar(completeness) }}</td></tr>
+    <tr><td><strong>{{ t.col_sources }}</strong>{{ help(t.help_sources) }}</td><td>{% if completeness.mapping_count == 0 %}<span style="color:#aaa">{{ t.sources_none }}</span>{% elif completeness.verified_mapping_count >= 1 %}<strong>{{ completeness.mapping_count }}</strong> <span class="src-verified">✓ {{ t.sources_verified }}</span>{% else %}<strong>{{ completeness.mapping_count }}</strong> <span class="src-unverified">{{ t.sources_unverified }}</span>{% endif %}</td></tr>
+    <tr><td><strong>{{ t.typical_preparation }}</strong></td><td>{% if ingredient.typical_state %}{{ t.methods.get(ingredient.typical_state) or t.states.get(ingredient.typical_state, ingredient.typical_state) }}{% else %}—{% endif %}</td></tr>
+    {% set raw_cooked_hint = "les deux" if (ingredient.can_eat_raw and ingredient.can_eat_cooked) else ("cru" if ingredient.can_eat_raw else ("cuit" if ingredient.can_eat_cooked else "")) %}
+    <tr><td><strong>{{ t.can_eat_raw }}</strong>{{ flag('cooking', 'raw_cooked', raw_cooked_hint) }}</td><td>{% if ingredient.can_eat_raw is none %}—{% elif ingredient.can_eat_raw %}{{ t.yes }}{% else %}{{ t.no }}{% endif %}</td></tr>
+    <tr><td><strong>{{ t.can_be_cooked }}</strong></td><td>{% if ingredient.can_eat_cooked is none %}—{% elif ingredient.can_eat_cooked %}{{ t.yes }}{% else %}{{ t.no }}{% endif %}</td></tr>
+    {% if ingredient.serving_mode %}<tr><td><strong>{{ t.serving_mode }}</strong>{{ flag('measures', 'serving_mode') }}</td><td>{{ t.serving_modes.get(ingredient.serving_mode, ingredient.serving_mode) }}{% if ingredient.serving_mode == 'measure' %}{{ help(t.help_serving_mode_measure) }}{% endif %}{% if ingredient.unit_label_en or ingredient.unit_label_fr %} ({{ (ingredient.unit_label_fr if lang == 'fr' else ingredient.unit_label_en) or ingredient.unit_label_en or ingredient.unit_label_fr }}){% endif %}</td></tr>{% endif %}
+    {% if ingredient.display_unit %}<tr><td><strong>{{ t.display_unit }}</strong>{{ flag('measures', 'display_unit', ingredient.display_unit) }}</td><td>{{ ingredient.display_unit }}</td></tr>{% endif %}
+    {% for state_name, meta in ingredient.states.items() %}
+    <tr><td><strong>{{ t.portion }} ({{ t.states.get(state_name, state_name) }})</strong>{% if meta.portion_g %}{{ flag('measures', 'reference_weight', meta.portion_g | int, 'g') }}{% endif %}</td><td>{% if meta.portion_g %}{{ meta.portion_g | int }} g{% else %}—{% endif %}</td></tr>
+    {% if meta.density_g_ml %}<tr><td><strong>{{ t.density }} ({{ t.states.get(state_name, state_name) }})</strong>{{ flag('measures', 'density', "%.2f"|format(meta.density_g_ml)) }}</td><td>{{ "%.2f"|format(meta.density_g_ml) }} g/mL</td></tr>{% endif %}
+    {% endfor %}
   </table>
 </div>
-{% endif %}
+</aside>
 
-{% if training_pairs %}
-<div class="card">
-  <h2>Training pairs <span style="font-size:0.8rem;font-weight:400;color:#888">(v2_training_pairs)</span></h2>
-  <table>
-    <thead>
-      <tr>
-        <th>Method</th>
-        <th>Yield</th>
-        <th>Type</th>
-        <th style="text-align:right">kcal</th>
-        <th style="text-align:right">Protein</th>
-        <th style="text-align:right">Fat</th>
-        <th style="text-align:right">Carbs</th>
-        <th style="text-align:right">Water</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for p in training_pairs %}
-      <tr>
-        <td>{{ p.cooking_method }}</td>
-        <td>{{ "%.3f"|format(p.yield_f) if p.yield_f else "—" }}</td>
-        <td>
-          {% if p.is_theoretical %}
-          <span style="color:#f39c12;font-size:0.8rem;font-weight:600">theoretical</span>
-          {% else %}
-          <span style="color:#27ae60;font-size:0.8rem;font-weight:600">known</span>
-          {% endif %}
-        </td>
-        <td style="text-align:right;color:#555">{% if p.cooked.energy_kcal is not none %}{{ p.cooked.energy_kcal | round(1) }}{% else %}—{% endif %}</td>
-        <td style="text-align:right;color:#555">{% if p.cooked.protein_g is not none %}{{ p.cooked.protein_g | round(1) }} g{% else %}—{% endif %}</td>
-        <td style="text-align:right;color:#555">{% if p.cooked.fat_g is not none %}{{ p.cooked.fat_g | round(1) }} g{% else %}—{% endif %}</td>
-        <td style="text-align:right;color:#555">{% if p.cooked.carbohydrates_g is not none %}{{ p.cooked.carbohydrates_g | round(1) }} g{% else %}—{% endif %}</td>
-        <td style="text-align:right;color:#555">{% if p.cooked.water_g is not none %}{{ p.cooked.water_g | round(1) }} g{% else %}—{% endif %}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-</div>
-{% endif %}
-
+<div class="main-col">
 <div hx-get="/ui/ingredients/{{ ingredient.id }}/predictions"
      hx-trigger="load"
      hx-swap="outerHTML">
   <div class="card">
-    <p style="color:#888">Loading nutritional predictions…</p>
+    <p style="color:#888">{{ t.loading_predictions }}</p>
   </div>
 </div>
 
+{% set training_pairs_by_method = {} %}
+{% for p in training_pairs %}{% set _ = training_pairs_by_method.update({p.cooking_method: p}) %}{% endfor %}
+{% set cooking_rows = [] %}
+{% set cooking_methods_seen = [] %}
+{% for rel in relationships %}
+  {% set _ = cooking_rows.append({"method": rel.cooking_method, "rel": rel, "pair": training_pairs_by_method.get(rel.cooking_method)}) %}
+  {% set _ = cooking_methods_seen.append(rel.cooking_method) %}
+{% endfor %}
+{% for p in training_pairs %}
+  {% if p.cooking_method not in cooking_methods_seen %}
+  {% set _ = cooking_rows.append({"method": p.cooking_method, "rel": none, "pair": p}) %}
+  {% endif %}
+{% endfor %}
+
+{% if cooking_rows %}
+<div class="card">
+  <h2>{{ t.cooking_relationships }} <span style="font-size:0.8rem;font-weight:400;color:#888">(v2_training_pairs)</span></h2>
+  <table>
+    <thead>
+      <tr>
+        <th>{{ t.col_method }}</th>
+        <th>{{ t.what_happens }}</th>
+        <th>{{ t.yield_factor }}{{ help(t.help_yield_factor) }}</th>
+        <th>{{ t.type }}</th>
+        <th>{{ t.confidence }}</th>
+        <th></th>
+        <th style="text-align:right">kcal</th>
+        <th style="text-align:right">{{ t.protein }}</th>
+        <th style="text-align:right">{{ t.fat }}</th>
+        <th style="text-align:right">{{ t.carbs }}</th>
+        <th style="text-align:right">{{ t.water }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in cooking_rows %}
+      {% set yf = row.rel.yield_factor if row.rel else (row.pair.yield_f if row.pair else none) %}
+      <tr>
+        <td><span class="badge badge-method-{{ row.method }}">{{ t.methods.get(row.method, row.method) }}</span></td>
+        <td>
+          {% if yf %}
+          {{ t.raw_100g }} → ~{{ (yf * 100) | round | int }} g {{ t.methods.get(row.method, row.method) }}
+          <span style="color:var(--ink-soft);font-size:0.8rem">
+            ({% if yf > 1.02 %}{{ t.gains_weight }}{% elif yf < 0.98 %}{{ t.loses_weight }}{% else %}{{ t.unchanged }}{% endif %})
+          </span>
+          {% else %}—{% endif %}
+        </td>
+        <td>{% if yf %}{{ "%.3f"|format(yf) }}{{ flag('cooking', 'yield', (yf * 100) | round(1), '%') }}{% else %}—{% endif %}</td>
+        <td>
+          {% if row.pair %}
+          {% if row.pair.is_theoretical %}
+          <span style="color:#f39c12;font-size:0.8rem;font-weight:600">{{ t.theoretical }}</span>
+          {% else %}
+          <span style="color:#27ae60;font-size:0.8rem;font-weight:600">{{ t.known }}</span>
+          {% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>{% if row.rel %}{{ confidence_cell(row.rel.confidence) }}{% else %}—{% endif %}</td>
+        <td style="white-space:nowrap">{% if row.rel %}{{ rel_vote_widget.relationship_vote_widget(ingredient.id, row.rel.cooking_method, relationship_votes.get(ingredient.id ~ ':' ~ row.rel.cooking_method, {"upvotes": 0, "downvotes": 0})) }}{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if row.pair and row.pair.cooked.energy_kcal is not none %}{{ row.pair.cooked.energy_kcal | round(1) }}{% else %}—{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if row.pair and row.pair.cooked.protein_g is not none %}{{ row.pair.cooked.protein_g | round(1) }} g{% else %}—{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if row.pair and row.pair.cooked.fat_g is not none %}{{ row.pair.cooked.fat_g | round(1) }} g{% else %}—{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if row.pair and row.pair.cooked.carbohydrates_g is not none %}{{ row.pair.cooked.carbohydrates_g | round(1) }} g{% else %}—{% endif %}</td>
+        <td style="text-align:right;color:#555">{% if row.pair and row.pair.cooked.water_g is not none %}{{ row.pair.cooked.water_g | round(1) }} g{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+{% if serving_units or ingredient.absorption_factors %}
+<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:1.5rem;margin-bottom:1.5rem">
+  {% if serving_units %}
+  <div class="card" style="margin:0">
+    <h2>{{ t.serving_units }}</h2>
+    <table>
+      <thead><tr><th>{{ t.col_unit }}</th><th>{{ t.col_label }}</th><th>{{ t.col_volume }}</th><th>{{ t.col_weight }}</th></tr></thead>
+      <tbody>
+        {% for u in serving_units %}
+        <tr>
+          <td><code>{{ u.unit }}</code></td>
+          <td>{% if lang == 'fr' %}{{ u.label_fr or u.label_en }}{% else %}{{ u.label_en or u.label_fr }}{% endif %}</td>
+          <td>{% if u.volume_ml %}{{ u.volume_ml | int }} mL{% else %}—{% endif %}</td>
+          <td>{{ "%.0f"|format(u.grams) }} g</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if ingredient.absorption_factors %}
+  <div class="card" style="margin:0">
+    <h2>{{ t.absorption_factors }}</h2>
+    <p style="font-size:0.78rem;color:#888;margin-bottom:0.5rem">{{ t.absorption_desc }}</p>
+    <table>
+      <thead><tr><th>{{ t.col_nutrient }}</th><th>{{ t.col_factor }}</th></tr></thead>
+      <tbody>
+        {% for nutrient, factor in ingredient.absorption_factors.items() %}
+        <tr><td>{{ nutrient }}</td><td>{{ "%.2f"|format(factor) }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
 {% set total_refs = (ciqual_rows|length) + (mccance_rows|length) + (usda_foundation_rows|length) + (usda_sr_rows|length) + (usda_rows|length) + (usda_cooking_yield_rows|length) %}
 {% if total_refs > 0 %}
+<h2 style="font-size:1rem;color:var(--ink-soft);margin-top:1.75rem">{{ t.raw_references_title }}</h2>
+<p style="font-size:0.82rem;color:var(--ink-soft);margin-bottom:1rem">{{ t.raw_references_desc }}</p>
 <div class="card" style="padding:0;overflow:hidden">
   <div style="display:grid;grid-template-columns:280px 1fr;min-height:400px">
 
@@ -174,6 +263,7 @@
 
       {% set method_order = [
         ("raw", "Raw"),
+        ("dry", "Dry"),
         ("boiled", "Boiled"),
         ("steamed", "Steamed"),
         ("grilled", "Grilled"),
@@ -181,6 +271,7 @@
         ("fried", "Fried"),
         ("cooked", "Cooked"),
       ] %}
+      {% set known_methods = method_order | map(attribute=0) | list %}
       {% for method, label in method_order %}
         {% set bucket = entries | selectattr("method", "equalto", method) | list %}
         {% if bucket %}
@@ -190,6 +281,14 @@
           {% endfor %}
         {% endif %}
       {% endfor %}
+      {% set leftover = entries | rejectattr("method", "in", known_methods) | list %}
+      {% if leftover %}
+        {# Catches any cooking_method not yet in method_order, so entries are never silently dropped. #}
+        {{ method_header("Other") }}
+        {% for entry in leftover %}
+          {{ ref_item(entry.panel_id, entry.source_label, entry.item_label, entry.sub_label, entry.method) }}
+        {% endfor %}
+      {% endif %}
 
       {% if usda_cooking_yield_rows %}
         {{ method_header("USDA Cooking Yields (name match)") }}
@@ -217,6 +316,7 @@
         <h3 style="margin-top:0">{{ row.alim_nom_fr }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· Ciqual · code {{ row.alim_code }}</small>
           <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
         </h3>
+        <p style="margin-bottom:0.5rem">{{ vote_widget.mapping_vote_widget(ingredient.id, "ciqual", row.alim_code, method, mapping_votes.get("ciqual:" ~ row.alim_code ~ ":" ~ method, {"upvotes": 0, "downvotes": 0}), dom_suffix="panel") }}{{ flag('other', 'free', "CIQUAL · " ~ row.alim_code, tip=t.feedback_flag_mapping_tip) }}</p>
         <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g edible portion</p>
         <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
           {{ section_header("Macronutrients") }}
@@ -257,6 +357,7 @@
         <h3 style="margin-top:0">{{ row.food_name }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· McCance &amp; Widdowson · {{ row.food_code }}{% if row.food_group %} · {{ row.food_group }}{% endif %}</small>
           <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
         </h3>
+        <p style="margin-bottom:0.5rem">{{ vote_widget.mapping_vote_widget(ingredient.id, "mccance", row.food_code, method, mapping_votes.get("mccance:" ~ row.food_code ~ ":" ~ method, {"upvotes": 0, "downvotes": 0}), dom_suffix="panel") }}{{ flag('other', 'free', "MCCANCE · " ~ row.food_code, tip=t.feedback_flag_mapping_tip) }}</p>
         <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g edible portion</p>
         <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
           {{ section_header("Macronutrients") }}
@@ -292,6 +393,7 @@
         <h3 style="margin-top:0">{{ row.description }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· USDA Foundation · FDC {{ row.fdc_id }}{% if row.food_category %} · {{ row.food_category }}{% endif %}</small>
           <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
         </h3>
+        <p style="margin-bottom:0.5rem">{{ vote_widget.mapping_vote_widget(ingredient.id, "usda_foundation", row.fdc_id, method, mapping_votes.get("usda_foundation:" ~ row.fdc_id ~ ":" ~ method, {"upvotes": 0, "downvotes": 0}), dom_suffix="panel") }}{{ flag('other', 'free', "USDA_FOUNDATION · " ~ row.fdc_id, tip=t.feedback_flag_mapping_tip) }}</p>
         <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g</p>
         <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
           {{ section_header("Macronutrients") }}
@@ -330,6 +432,7 @@
         <h3 style="margin-top:0">{{ row.description }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· USDA SR Legacy · FDC {{ row.fdc_id }}{% if row.food_category %} · {{ row.food_category }}{% endif %}</small>
           <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
         </h3>
+        <p style="margin-bottom:0.5rem">{{ vote_widget.mapping_vote_widget(ingredient.id, "usda_sr", row.fdc_id, method, mapping_votes.get("usda_sr:" ~ row.fdc_id ~ ":" ~ method, {"upvotes": 0, "downvotes": 0}), dom_suffix="panel") }}{{ flag('other', 'free', "USDA_SR · " ~ row.fdc_id, tip=t.feedback_flag_mapping_tip) }}</p>
         <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g</p>
         <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
           {{ section_header("Macronutrients") }}
@@ -368,6 +471,7 @@
         <h3 style="margin-top:0">{{ row.description }} <small style="font-size:0.75rem;color:#888;font-weight:normal">· USDA FNDDS · FDC {{ row.fdc_id }}{% if row.wweia_category %} · {{ row.wweia_category }}{% endif %}</small>
           <span class="badge badge-method-{{ method }}" style="font-size:0.7rem;margin-left:0.5rem;vertical-align:middle">{{ method }}</span>
         </h3>
+        <p style="margin-bottom:0.5rem">{{ vote_widget.mapping_vote_widget(ingredient.id, "usda", row.fdc_id, method, mapping_votes.get("usda:" ~ row.fdc_id ~ ":" ~ method, {"upvotes": 0, "downvotes": 0}), dom_suffix="panel") }}{{ flag('other', 'free', "USDA · " ~ row.fdc_id, tip=t.feedback_flag_mapping_tip) }}</p>
         <p style="font-size:0.75rem;color:#999;margin-bottom:0.75rem">Per 100 g — survey data</p>
         <table><thead><tr><th>Nutrient</th><th>Value</th></tr></thead><tbody>
           {{ nutrient_row("Energy (kcal)", row.energy_kcal, "%.1f") }}
@@ -396,7 +500,169 @@
 </div>
 {% endif %}
 
+{% set all_mappings = [] %}
+{% for source, maps in source_mappings.items() %}{% for m in maps %}{% set _ = all_mappings.append(m) %}{% endfor %}{% endfor %}
+{% if all_mappings %}
+<h2 style="font-size:1rem;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:1.75rem;margin-top:2.25rem">{{ t.data_provenance }}</h2>
+<p style="font-size:0.82rem;color:var(--ink-soft);margin-bottom:1rem">
+  {{ t.provenance_desc }}
+</p>
+{% endif %}
+
+{% if all_mappings %}
+<div class="card">
+  <h2>{{ t.source_mappings }}</h2>
+  <table>
+    <thead><tr><th>{{ t.source }}</th><th>{{ t.col_id }}</th><th>{{ t.col_label }}</th><th>{{ t.col_state }}</th><th>{{ t.confidence }}{{ help(t.help_mapping_confidence) }}</th><th></th></tr></thead>
+    <tbody>
+      {% for m in all_mappings %}
+      <tr>
+        <td><span class="badge badge-{{ m.source }}">{{ m.source | upper }}</span></td>
+        <td><code>{{ m.source_id }}</code></td>
+        <td>{{ m.label or "—" }}</td>
+        <td><span class="badge badge-method-{{ m.cooking_method or 'raw' }}" style="font-size:0.65rem">{{ t.methods.get(m.cooking_method or 'raw', m.cooking_method) }}</span></td>
+        <td>{{ confidence_cell(m.confidence) }}</td>
+        <td style="white-space:nowrap">{{ vote_widget.mapping_vote_widget(ingredient.id, m.source, m.source_id, m.cooking_method or 'raw', m.votes) }}{{ flag('other', 'free', (m.source | upper) ~ ' · ' ~ m.source_id, tip=t.feedback_flag_mapping_tip) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+</div>
+</div>
+
+<div id="feedback-modal" class="feedback-overlay" style="display:none" onclick="if (event.target === this) closeFeedback()">
+  <div class="feedback-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem">
+      <h2 style="margin:0">{{ t.feedback_modal_title }}</h2>
+      <button type="button" class="help-tip" style="width:24px;height:24px" onclick="closeFeedback()" aria-label="{{ t.feedback_cancel }}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+    </div>
+
+    <div id="feedback-step-category">
+      <p style="font-size:0.85rem;color:var(--ink-soft);margin-bottom:0.75rem">{{ t.feedback_pick_category }}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-bottom:1rem">
+        {% for cat in feedback_categories %}
+        <button type="button" class="filter-btn" id="fb-cat-{{ cat.code }}" onclick="selectFeedbackCategory('{{ cat.code }}')">{{ cat.label }}</button>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% for cat in feedback_categories %}
+    <div class="fb-errors" id="fb-errors-{{ cat.code }}" style="display:none;margin-bottom:1rem">
+      <p style="font-size:0.85rem;color:var(--ink-soft);margin-bottom:0.5rem">{{ t.feedback_pick_error }}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:0.5rem">
+        {% for err in cat.errors %}
+        <button type="button" class="filter-btn" id="fb-err-{{ cat.code }}-{{ err.code }}" onclick="selectFeedbackError('{{ cat.code }}', '{{ err.code }}')">{{ err.label }}</button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+    <form id="feedback-form" style="display:none" hx-post="/ui/ingredients/{{ ingredient.id }}/feedback" hx-target="#feedback-response" hx-swap="innerHTML">
+      <input type="hidden" name="category" id="fb-input-category">
+      <input type="hidden" name="code" id="fb-input-code">
+      <div id="fb-current-value" style="display:none;font-size:0.8rem;color:var(--ink-soft);margin-bottom:0.6rem"></div>
+
+      {% for cat in feedback_categories %}
+      {% for err in cat.errors %}
+      {% if err.code != 'free' %}
+      <div class="fb-value-input" id="fb-value-{{ cat.code }}-{{ err.code }}" style="display:none;margin-bottom:0.85rem">
+        <label style="font-size:0.8rem;font-weight:600;display:block;margin-bottom:0.3rem">{{ err.label }}{% if err.suffix %} ({{ err.suffix }}){% endif %}</label>
+        {% if err.input_kind == 'number' %}
+        <input type="text" inputmode="decimal" name="value" disabled required placeholder="{{ err.suffix or '' }}">
+        {% elif err.input_kind == 'number_unit' %}
+        <div style="display:flex;gap:0.5rem">
+          <input type="text" inputmode="decimal" name="value" disabled required style="flex:1">
+          <select name="unit" disabled style="width:100px">
+            {% for u in err.units %}<option value="{{ u }}">{{ u }}</option>{% endfor %}
+          </select>
+        </div>
+        {% elif err.input_kind == 'select' %}
+        <select name="value" disabled required>
+          <option value=""></option>
+          {% for opt in err.options %}<option value="{{ opt.code }}">{{ opt.label }}</option>{% endfor %}
+        </select>
+        {% else %}
+        <input type="text" name="value" disabled required placeholder="{{ err.placeholder or '' }}">
+        {% endif %}
+      </div>
+      {% endif %}
+      {% endfor %}
+      {% endfor %}
+
+      <div style="margin-bottom:1rem">
+        <label style="font-size:0.8rem;font-weight:600;display:block;margin-bottom:0.3rem">{{ t.feedback_comment_label }}</label>
+        <textarea name="comment" id="fb-comment" rows="3" placeholder="{{ t.feedback_comment_placeholder }}"></textarea>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:0.6rem">
+        <button type="button" class="filter-btn" onclick="closeFeedback()">{{ t.feedback_cancel }}</button>
+        <button type="submit" class="btn">{{ t.feedback_submit }}</button>
+      </div>
+    </form>
+    <div id="feedback-response"></div>
+  </div>
+</div>
+
 <script>
+  const FEEDBACK_CURRENT_VALUE_LABEL = {{ t.feedback_current_value | tojson }};
+
+  function openFeedback(category, code, hintValue, hintUnit) {
+    document.getElementById('feedback-modal').style.display = 'flex';
+    document.getElementById('feedback-response').innerHTML = '';
+    document.getElementById('feedback-step-category').style.display = 'block';
+    document.querySelectorAll('.fb-errors').forEach(el => el.style.display = 'none');
+    document.getElementById('feedback-form').style.display = 'none';
+    if (category) {
+      selectFeedbackCategory(category);
+      if (code) selectFeedbackError(category, code, hintValue, hintUnit);
+    }
+  }
+
+  function closeFeedback() {
+    document.getElementById('feedback-modal').style.display = 'none';
+  }
+
+  function selectFeedbackCategory(category) {
+    document.querySelectorAll('.fb-errors').forEach(el => el.style.display = 'none');
+    document.getElementById('feedback-form').style.display = 'none';
+    document.querySelectorAll('#feedback-step-category .filter-btn').forEach(b => b.classList.toggle('active', b.id === 'fb-cat-' + category));
+    const errBox = document.getElementById('fb-errors-' + category);
+    if (errBox) errBox.style.display = 'block';
+  }
+
+  function selectFeedbackError(category, code, hintValue, hintUnit) {
+    document.querySelectorAll('.fb-errors .filter-btn').forEach(b => b.classList.toggle('active', b.id === 'fb-err-' + category + '-' + code));
+    document.getElementById('fb-input-category').value = category;
+    document.getElementById('fb-input-code').value = code;
+
+    document.querySelectorAll('.fb-value-input input, .fb-value-input select').forEach(f => f.disabled = true);
+    document.querySelectorAll('.fb-value-input').forEach(el => el.style.display = 'none');
+    const valueBox = document.getElementById('fb-value-' + category + '-' + code);
+    if (valueBox) {
+      valueBox.style.display = 'block';
+      valueBox.querySelectorAll('input, select').forEach(f => f.disabled = false);
+    }
+
+    const currentValueBox = document.getElementById('fb-current-value');
+    if (hintValue) {
+      currentValueBox.textContent = FEEDBACK_CURRENT_VALUE_LABEL + ' ' + hintValue + (hintUnit ? ' ' + hintUnit : '');
+      currentValueBox.style.display = 'block';
+    } else {
+      currentValueBox.style.display = 'none';
+    }
+
+    const comment = document.getElementById('fb-comment');
+    comment.required = (category === 'other' && code === 'free');
+    if (category === 'other' && code === 'free' && hintValue && !comment.value) {
+      comment.value = '[' + hintValue + '] ';
+    }
+
+    document.getElementById('feedback-form').style.display = 'block';
+  }
+
   function selectRef(panelId) {
     document.querySelectorAll('.ref-panel').forEach(p => p.style.display = 'none');
     document.querySelectorAll('.ref-btn').forEach(b => b.style.background = '');
@@ -409,5 +675,11 @@
 
   const firstBtn = document.querySelector('.ref-btn');
   if (firstBtn) firstBtn.click();
+
+  document.querySelectorAll('.mapping-votes[data-mapping-key]').forEach(function (el) {
+    if (localStorage.getItem('voted-mapping-' + el.dataset.mappingKey)) {
+      el.querySelectorAll('.vote-seg').forEach(function (b) { b.disabled = true; });
+    }
+  });
 </script>
 {% endblock %}

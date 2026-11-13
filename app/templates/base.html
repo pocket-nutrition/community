@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}Food Dataset · Pocket Nutrition{% endblock %}</title>
+  <meta name="description" content="{{ t.meta_description }}">
+  <meta property="og:title" content="Food Dataset · Pocket Nutrition">
+  <meta property="og:description" content="{{ t.meta_description }}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥕</text></svg>">
-  <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+  <script src="/static/htmx.min.js"></script>
   <style>
     :root {
       --paper: #faf7f0; --cream: #f1ead9; --ink: #1e2b22; --ink-soft: #4a5a4e;
@@ -18,24 +21,90 @@
       --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
       --radius: 18px; --radius-sm: 10px;
+      /* Page width and side gutter shared with every Pocket Nutrition site. */
+      --site-max: 72rem; --site-gutter: clamp(1.5rem, 5vw, 4rem);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: var(--font-body); color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; }
+    body { font-family: var(--font-body); color: var(--ink); background: var(--paper); -webkit-font-smoothing: antialiased; min-height: 100vh; display: flex; flex-direction: column; }
 
-    nav { background: rgba(250,247,240,.92); border-bottom: 1px solid var(--line); padding: 0.9rem 2rem; display: flex; gap: 1.6rem; align-items: center; flex-wrap: wrap; position: sticky; top: 0; z-index: 10; backdrop-filter: blur(8px); }
-    nav a { color: var(--ink-soft); text-decoration: none; font-size: 0.85rem; font-weight: 500; }
-    nav a.nav-highlight { color: var(--leaf-deep); font-weight: 700; border-bottom: 2px solid var(--carrot); padding-bottom: 0.15rem; }
-    nav a:hover { color: var(--leaf-deep); }
-    nav .brand { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; color: var(--ink); text-decoration: none; margin-right: 0.5rem; }
-    nav .brand .mark { color: var(--carrot); }
-    nav .brand small { font-family: var(--font-body); font-size: 0.68rem; font-weight: 600; color: var(--ink-soft); margin-left: 0.45rem; letter-spacing: 0.1em; text-transform: uppercase; }
+    /*
+     * Shared header and footer, copied from pocket-nutrition-website
+     * (src/components/site-nav/site-nav.css, src/components/site-footer/site-footer.css):
+     * the group bar lists the group's sites identically everywhere, the site bar holds the
+     * Food Dataset's own links. Change both repositories together.
+     */
+    .pn-wordmark { display: inline-flex; align-items: baseline; font-family: var(--font-display); font-size: 1.2rem; font-weight: 600; line-height: 1; color: var(--ink); text-decoration: none; white-space: nowrap; }
+    .pn-wordmark .pn-wordmark-mark { color: var(--carrot); }
+    .pn-wordmark .pn-wordmark-suffix { margin-left: 0.5rem; font-family: var(--font-body); font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
 
-    main { max-width: 1100px; margin: 2.25rem auto 3.5rem; padding: 0 1.5rem; }
+    .group-bar { background: var(--ink); font-family: var(--font-body); font-size: 0.78rem; line-height: 1; }
+    .group-bar .group-bar-inner { display: flex; justify-content: space-between; gap: 1.5rem; max-width: var(--site-max); height: 2.25rem; margin: 0 auto; padding: 0 var(--site-gutter); }
+    .group-bar .group-bar-sites { display: flex; gap: 1.375rem; list-style: none; }
+    .group-bar .group-bar-sites > li { display: flex; }
+    .group-bar .group-bar-link { display: inline-flex; align-items: center; gap: 0.25rem; font-weight: 500; color: rgba(250,247,240,.72); text-decoration: none; white-space: nowrap; transition: color 0.15s; }
+    .group-bar .group-bar-link:hover { color: var(--paper); }
+    .group-bar .group-bar-link[aria-current] { font-weight: 600; color: var(--paper); box-shadow: inset 0 -2px 0 var(--carrot); }
+    .group-bar .group-bar-star { width: 0.8rem; height: 0.8rem; fill: var(--carrot); }
+    .group-bar .group-bar-external { width: 0.75rem; height: 0.75rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+
+    .site-nav { position: sticky; top: 0; z-index: 40; border-bottom: 1px solid var(--line); background: rgba(250,247,240,.92); backdrop-filter: blur(8px); font-family: var(--font-body); line-height: 1.2; }
+    .site-nav .site-nav-inner { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; max-width: var(--site-max); height: 3.75rem; margin: 0 auto; padding: 0 var(--site-gutter); }
+    .site-nav .site-nav-links { display: flex; align-items: center; align-self: stretch; gap: 1.5rem; }
+    .site-nav .site-nav-link { display: inline-flex; align-items: center; align-self: stretch; font-size: 0.88rem; font-weight: 500; color: var(--ink-soft); text-decoration: none; transition: color 0.15s; }
+    .site-nav .site-nav-link:hover { color: var(--leaf-deep); }
+    .site-nav .site-nav-link[aria-current] { font-weight: 600; color: var(--ink); box-shadow: inset 0 -2px 0 var(--carrot); }
+    .site-nav .site-nav-divider { width: 1px; height: 1.25rem; background: var(--line); }
+    .site-nav .lang-switch { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.78rem; font-weight: 600; color: var(--ink-soft); }
+    .site-nav .lang-switch a { padding-bottom: 0.1rem; border-bottom: 2px solid transparent; color: var(--ink-soft); text-decoration: none; }
+    .site-nav .lang-switch a:hover { color: var(--leaf-deep); }
+    .site-nav .lang-switch a[aria-current] { border-bottom-color: var(--carrot); color: var(--ink); }
+    .site-nav .site-nav-toggle { display: none; }
+    .group-bar .group-bar-link:focus-visible, .site-nav a:focus-visible, .site-nav .site-nav-toggle:focus-visible { outline: 2px solid var(--carrot); outline-offset: 2px; border-radius: 4px; }
+
+    @media (max-width: 860px) {
+      .group-bar .group-bar-inner { overflow-x: auto; scrollbar-width: none; }
+      .group-bar .group-bar-inner::-webkit-scrollbar { display: none; }
+      .group-bar .group-bar-sites { gap: 1rem; }
+      .site-nav .site-nav-toggle { display: inline-flex; align-items: center; justify-content: center; width: 2.75rem; height: 2.75rem; margin-right: -0.6rem; border: 0; border-radius: 10px; background: transparent; color: var(--ink); cursor: pointer; }
+      .site-nav .site-nav-toggle svg { width: 1.4rem; height: 1.4rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+      .site-nav .site-nav-links { display: none; }
+      .site-nav .site-nav-links.is-open { position: absolute; top: 100%; left: 0; right: 0; display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0.5rem var(--site-gutter) 1.5rem; border-bottom: 1px solid var(--line); background: var(--paper); box-shadow: 0 24px 32px -28px rgba(31,61,41,.5); }
+      .site-nav .site-nav-links.is-open .site-nav-link { min-height: 2.75rem; font-size: 1rem; }
+      .site-nav .site-nav-links.is-open .site-nav-link[aria-current] { padding-left: 0.85rem; box-shadow: inset 3px 0 0 var(--carrot); }
+      .site-nav .site-nav-links.is-open .site-nav-divider { width: auto; height: 1px; margin: 0.5rem 0; }
+      .site-nav .site-nav-links.is-open .lang-switch { min-height: 2.75rem; font-size: 0.95rem; }
+    }
+
+    .site-footer { background: var(--ink); font-family: var(--font-body); font-size: 0.86rem; line-height: 1.6; color: rgba(250,247,240,.75); }
+    .site-footer .site-footer-inner { max-width: var(--site-max); margin: 0 auto; padding: 3.5rem var(--site-gutter) 2rem; }
+    .site-footer .site-footer-grid { display: grid; grid-template-columns: 2fr repeat(3, 1fr); gap: 2.5rem 2rem; padding-bottom: 2.5rem; }
+    .site-footer .pn-wordmark, .site-footer .pn-wordmark:hover { color: var(--paper); }
+    .site-footer .site-footer-tagline { max-width: 32ch; margin-top: 0.85rem; }
+    .site-footer .site-footer-sources { max-width: 40ch; margin-top: 1rem; font-size: 0.78rem; color: rgba(250,247,240,.62); }
+    .site-footer .site-footer-sources a { color: inherit; text-decoration: underline; text-decoration-color: rgba(250,247,240,.3); text-underline-offset: 2px; }
+    .site-footer .site-footer-heading { margin-bottom: 0.9rem; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: rgba(250,247,240,.62); }
+    .site-footer .site-footer-links { display: grid; gap: 0.55rem; list-style: none; }
+    .site-footer a { color: rgba(250,247,240,.85); text-decoration: none; }
+    .site-footer a:hover { color: var(--carrot-soft); }
+    .site-footer a:focus-visible { outline: 2px solid var(--carrot); outline-offset: 2px; border-radius: 2px; }
+    .site-footer .site-footer-bottom { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.75rem 1.5rem; padding-top: 1.5rem; border-top: 1px solid rgba(250,247,240,.15); font-size: 0.76rem; color: rgba(250,247,240,.62); }
+    .site-footer .site-footer-bottom-links { display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; }
+    .site-footer .site-footer-love { margin-top: 1.75rem; text-align: center; font-size: 0.76rem; color: rgba(250,247,240,.62); }
+    .site-footer .site-footer-heart { color: var(--carrot); }
+    @media (max-width: 820px) {
+      .site-footer .site-footer-grid { grid-template-columns: 1fr 1fr; }
+      .site-footer .site-footer-grid > :first-child { grid-column: 1 / -1; }
+    }
+    @media (max-width: 420px) {
+      .site-footer .site-footer-grid { grid-template-columns: 1fr; }
+    }
+
+    main { max-width: var(--site-max); margin: 2.25rem auto 3.5rem; padding: 0 var(--site-gutter); width: 100%; flex: 1; }
     h1 { font-family: var(--font-display); font-weight: 500; font-size: 2rem; margin-bottom: 1rem; }
     h2 { font-family: var(--font-display); font-weight: 500; font-size: 1.2rem; margin-bottom: 0.75rem; }
     h3 { font-family: var(--font-display); font-weight: 500; }
 
-    .card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.25rem; }
+    .card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 1.5rem; margin-bottom: 1.25rem; overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 0.87rem; }
     th { background: rgba(241,234,217,.5); color: var(--ink-soft); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 600; padding: 0.65rem 0.8rem; text-align: left; border-bottom: 1px solid var(--line); }
     td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line); }
@@ -74,12 +143,14 @@
     .badge-usda { background: var(--sea-soft); color: #274b58; }
     .badge-unlinked { background: transparent; color: #7a5116; border: 1.5px dashed var(--warn); }
     .badge-method-raw     { background: var(--cream); color: var(--ink-soft); }
+    .badge-method-processed { background: var(--plum-soft); color: #55304a; }
     .badge-method-cooked  { background: var(--carrot-soft); color: #8a4a17; }
     .badge-method-boiled  { background: var(--sea-soft); color: #274b58; }
     .badge-method-steamed { background: var(--sea-soft); color: #0f5e56; }
     .badge-method-grilled { background: var(--bad-soft); color: #7c2d20; }
     .badge-method-roasted { background: var(--cream); color: var(--ink-soft); }
     .badge-method-fried   { background: var(--warn-soft); color: #7a5116; }
+    .badge-method-dry     { background: var(--cream); color: var(--ink-soft); }
 
     .search-bar { margin-bottom: 1rem; display: flex; gap: 0.5rem; }
     .search-bar input { flex: 1; }
@@ -87,47 +158,159 @@
     .filter-btn { padding: 0.35rem 0.85rem; border-radius: 999px; border: 1px solid var(--line); background: #fff; cursor: pointer; font-size: 0.78rem; font-weight: 600; color: var(--ink-soft); }
     .filter-btn:hover { border-color: var(--leaf); color: var(--leaf-deep); }
     .filter-btn.active { background: var(--leaf-deep); color: var(--paper); border-color: var(--leaf-deep); }
+    .filter-count { opacity: 0.55; font-weight: 500; font-size: 0.7rem; margin-left: 0.15rem; }
+    .conf { display: inline-block; width: 44px; height: 6px; border-radius: 3px; background: rgba(30,43,34,.1); vertical-align: middle; margin-right: 0.35rem; overflow: hidden; }
+    .conf > span { display: block; height: 100%; border-radius: 3px; }
+    .src-verified { color: var(--ok); font-weight: 600; font-size: 0.78rem; }
+    .src-unverified { color: var(--warn); font-size: 0.78rem; }
     a.link { color: var(--leaf-deep); text-decoration: none; font-weight: 600; }
     a.link:hover { color: var(--carrot); text-decoration: underline; }
+    .cap { display: inline-block; }
+    .cap::first-letter { text-transform: uppercase; }
+    tr.clickable { cursor: pointer; }
 
-    .proposal-form { max-width: 540px; }
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.3rem; font-size: 0.85rem; font-weight: 600; }
-    .success-msg { color: var(--leaf-deep); background: var(--ok-soft); padding: 0.8rem 1rem; border-radius: var(--radius-sm); }
-    .error-msg { color: #7c2d20; background: var(--bad-soft); padding: 0.8rem 1rem; border-radius: var(--radius-sm); }
-    .htmx-indicator { display: none; }
-    .htmx-request .htmx-indicator { display: inline; }
-    .htmx-request.htmx-indicator { display: inline; }
     .info-box { background: var(--cream); border-left: 4px solid var(--leaf); padding: 1rem 1.3rem; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; margin-bottom: 1.5rem; font-size: 0.88rem; color: var(--ink-soft); line-height: 1.65; }
     .info-box strong { color: var(--ink); }
     .info-box code { background: rgba(255,255,255,.7); border: 1px solid var(--line); padding: 0.08rem 0.35rem; border-radius: 5px; font-size: 0.8rem; }
-    .field-help { font-size: 0.78rem; color: var(--ink-soft); margin-top: 0.25rem; }
+
+    .help-tip { display: inline-flex; align-items: center; justify-content: center; width: 15px; height: 15px; padding: 0; border-radius: 50%; border: 1px solid var(--ink-soft); background: transparent; color: var(--ink-soft); font-size: 0.62rem; font-weight: 700; line-height: 1; cursor: help; margin-left: 0.35rem; vertical-align: middle; font-family: var(--font-body); }
+    .help-tip:hover, .help-tip:focus-visible { border-color: var(--leaf-deep); color: var(--leaf-deep); background: var(--cream); outline: none; }
+    .help-tip svg { width: 45%; height: 45%; display: block; }
+
+    .flag-btn { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border-radius: 50%; border: none; background: transparent; color: var(--ink-soft); cursor: pointer; margin-left: 0.3rem; vertical-align: middle; opacity: 0.5; transition: opacity 120ms, color 120ms, background 120ms; }
+    .flag-btn svg { width: 12px; height: 12px; display: block; }
+    .flag-btn:hover, .flag-btn:focus-visible { opacity: 1; color: var(--warn); background: var(--warn-soft); outline: none; }
+
+    .feedback-overlay { position: fixed; inset: 0; background: rgba(30,43,34,.45); display: flex; align-items: center; justify-content: center; padding: 1.5rem; z-index: 100; }
+    .feedback-modal { background: var(--paper); border-radius: var(--radius); padding: 1.75rem; width: 100%; max-width: 480px; max-height: 85vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(30,43,34,.3); }
+    .feedback-result { margin-top: 0.75rem; padding: 0.65rem 0.9rem; border-radius: var(--radius-sm); font-size: 0.85rem; }
+    .feedback-result-ok { background: var(--ok-soft); color: var(--leaf-deep); }
+    .feedback-result-err { background: var(--bad-soft); color: #7c2d20; }
+
+    .mapping-votes { display: inline-flex; align-items: center; gap: 0.5rem; white-space: nowrap; vertical-align: middle; }
+    .vote-pill { display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: #fff; white-space: nowrap; }
+    .vote-seg { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.15rem 0.55rem; border: none; background: transparent; font-size: 0.72rem; line-height: 1.4; color: var(--ink-soft); cursor: pointer; white-space: nowrap; }
+    .vote-seg + .vote-seg { border-left: 1px solid var(--line); }
+    .vote-seg:hover:not(:disabled), .vote-seg:focus-visible:not(:disabled) { background: var(--cream); color: var(--leaf-deep); outline: none; }
+    .vote-seg:disabled { opacity: 0.55; cursor: default; }
+    .vote-btn-error { font-size: 0.72rem; color: #7c2d20; }
+
+    .ingredient-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 1.5rem; align-items: start; }
+    .ingredient-layout .sidebar { grid-column: 2; grid-row: 1; }
+    .ingredient-layout .main-col { grid-column: 1; grid-row: 1; min-width: 0; }
+    .ingredient-layout .sidebar .card { position: sticky; top: 1.25rem; margin-bottom: 0; }
+    .ingredient-layout .sidebar table tr { display: block; padding: 0.55rem 0; border-bottom: 1px solid var(--line); }
+    .ingredient-layout .sidebar table tr:last-child { border-bottom: none; }
+    .ingredient-layout .sidebar table td { display: block; padding: 0; border-bottom: none; }
+    .ingredient-layout .sidebar table td:first-child { margin-bottom: 0.25rem; }
+    @media (max-width: 860px) {
+      .ingredient-layout { grid-template-columns: 1fr; }
+      .ingredient-layout .sidebar { grid-column: 1; grid-row: 1; }
+      .ingredient-layout .main-col { grid-column: 1; grid-row: 2; }
+      .ingredient-layout .sidebar .card { position: static; margin-bottom: 1.25rem; }
+    }
   </style>
 </head>
 <body>
-  <nav>
-    <a class="brand" href="/ui/dashboard">pocket<span class="mark">·</span>nutrition<small>Food Dataset</small></a>
-    <a href="/ui/dashboard" {% if request.url.path == '/ui/dashboard' %}class="nav-highlight"{% endif %}>Dashboard</a>
-    <a href="/ui/ingredients" {% if request.url.path.startswith('/ui/ingredients') %}class="nav-highlight"{% endif %}>Ingredients</a>
-    <a href="/ui/relationships" {% if request.url.path.startswith('/ui/relationships') %}class="nav-highlight"{% endif %}>Relationships</a>
-    <a href="/ui/sr-pairs" {% if request.url.path.startswith('/ui/sr-pairs') %}class="nav-highlight"{% endif %}>SR Pairs</a>
-    <a href="/ui/feedback" {% if request.url.path.startswith('/ui/feedback') %}class="nav-highlight"{% endif %}>Feedback</a>
-    <span style="margin-left:auto;display:flex;align-items:center;gap:0.75rem;">
-      <a href="https://pocketnutrition.org" style="font-size:0.78rem;">pocketnutrition.org ↗</a>
-      <span id="cache-msg"></span>
-      <button class="btn" style="padding:0.35rem 0.9rem;font-size:0.8rem;background:transparent;color:var(--leaf-deep);border:1.5px solid var(--leaf-deep);"
-              hx-post="/ui/reload"
-              hx-target="#cache-msg"
-              hx-swap="outerHTML"
-              hx-indicator="#reload-spinner"
-              hx-confirm="Reload all data from GitHub? This takes ~20 seconds.">
-        ⟳ Reload
-      </button>
-      <span id="reload-spinner" class="htmx-indicator" style="font-size:0.8rem;color:var(--ink-soft);">⟳ Loading…</span>
-    </span>
+  {# Shared header, same markup as pocket-nutrition-website (src/components/site-nav): the group
+     bar is identical on every Pocket Nutrition site, in English; the site bar is this site's. #}
+  <nav class="group-bar" aria-label="Pocket Nutrition sites">
+    <div class="group-bar-inner">
+      <ul class="group-bar-sites">
+        <li><a class="group-bar-link" href="https://website.pocketnutrition.org/">Website</a></li>
+        <li><a class="group-bar-link" href="/ui/ingredients" aria-current="true">Food Dataset</a></li>
+        <li><a class="group-bar-link" href="https://website.pocketnutrition.org/docs">Docs</a></li>
+        <li><a class="group-bar-link" href="https://api.pocketnutrition.org/swagger-ui/index.html">API<svg class="group-bar-external" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a></li>
+      </ul>
+      <a class="group-bar-link" href="https://github.com/pocket-nutrition/pocket-nutrition"><svg class="group-bar-star" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>Star on GitHub<svg class="group-bar-external" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
+    </div>
   </nav>
+  <header class="site-nav">
+    <div class="site-nav-inner">
+      <a class="pn-wordmark" href="/ui/ingredients" aria-label="Pocket Nutrition Food Dataset">pocket<span class="pn-wordmark-mark">·</span>nutrition<span class="pn-wordmark-suffix">Food Dataset</span></a>
+      <button type="button" class="site-nav-toggle" aria-label="Menu" aria-expanded="false" aria-controls="site-nav-links">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+      <nav id="site-nav-links" class="site-nav-links" aria-label="Food Dataset">
+        <a class="site-nav-link" href="/ui/ingredients" {% if request.url.path.startswith('/ui/ingredients') %}aria-current="page"{% endif %}>{{ t.nav_ingredients }}</a>
+        <a class="site-nav-link" href="/ui/about" {% if request.url.path.startswith('/ui/about') %}aria-current="page"{% endif %}>{{ t.nav_about }}</a>
+        <a class="site-nav-link" href="{{ knowledge_editor_guide_url }}">{{ t.nav_contribute }}</a>
+        <span class="site-nav-divider" aria-hidden="true"></span>
+        {% set current_url = request.url.path ~ ('?' ~ request.url.query if request.url.query else '') %}
+        <span class="lang-switch">
+          <a href="/ui/lang/en?next={{ current_url | urlencode }}" lang="en" {% if lang == 'en' %}aria-current="true"{% endif %}>EN</a>
+          <span aria-hidden="true">·</span>
+          <a href="/ui/lang/fr?next={{ current_url | urlencode }}" lang="fr" {% if lang == 'fr' %}aria-current="true"{% endif %}>FR</a>
+        </span>
+      </nav>
+    </div>
+  </header>
+  <script>
+    // Small screens: the site bar's links fold behind the menu button.
+    (function () {
+      var toggle = document.querySelector('.site-nav-toggle');
+      var links = document.getElementById('site-nav-links');
+      var icon = toggle.querySelector('path');
+      function setOpen(isOpen) {
+        toggle.setAttribute('aria-expanded', String(isOpen));
+        links.classList.toggle('is-open', isOpen);
+        icon.setAttribute('d', isOpen ? 'M6 6l12 12M18 6 6 18' : 'M4 7h16M4 12h16M4 17h16');
+      }
+      toggle.addEventListener('click', function () {
+        setOpen(toggle.getAttribute('aria-expanded') !== 'true');
+      });
+      document.addEventListener('keydown', function (event) {
+        if (event.key === 'Escape') setOpen(false);
+      });
+    })();
+  </script>
   <main>
     {% block content %}{% endblock %}
   </main>
+  {# Shared footer, same markup as pocket-nutrition-website (src/components/site-footer). #}
+  <footer class="site-footer">
+    <div class="site-footer-inner">
+      <div class="site-footer-grid">
+        <div>
+          <a class="pn-wordmark" href="https://website.pocketnutrition.org/" aria-label="Pocket Nutrition">pocket<span class="pn-wordmark-mark">·</span>nutrition</a>
+          <p class="site-footer-tagline">Open, verifiable nutrition intelligence. Built by a community, owned by everyone.</p>
+          <p class="site-footer-sources">Reference data: <a href="https://ciqual.anses.fr">Ciqual (ANSES)</a>, <a href="https://world.openfoodfacts.org">Open Food Facts</a> and <a href="https://fdc.nal.usda.gov">USDA FoodData Central</a>.</p>
+        </div>
+        <div>
+          <p class="site-footer-heading">Website</p>
+          <ul class="site-footer-links">
+            <li><a href="https://website.pocketnutrition.org/#apps">Get the app</a></li>
+            <li><a href="https://website.pocketnutrition.org/calculator">Calculator</a></li>
+            <li><a href="https://website.pocketnutrition.org/examples">Examples</a></li>
+            <li><a href="https://website.pocketnutrition.org/privacy">Privacy policy</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="site-footer-heading">Food Dataset</p>
+          <ul class="site-footer-links">
+            <li><a href="/ui/ingredients">Ingredients</a></li>
+            <li><a href="/ui/about">About the dataset</a></li>
+            <li><a href="/ui/stats">Statistics</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="site-footer-heading">Docs</p>
+          <ul class="site-footer-links">
+            <li><a href="https://website.pocketnutrition.org/docs/self-hosting/overview">Self-hosting</a></li>
+            <li><a href="{{ knowledge_editor_guide_url }}">Knowledge Editor</a></li>
+            <li><a href="https://api.pocketnutrition.org/swagger-ui/index.html">API reference</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="site-footer-bottom">
+        <span>© 2026 Pocket Nutrition contributors · AGPL-3.0-or-later &amp; MPL-2.0</span>
+        <span class="site-footer-bottom-links">
+          <a href="https://status.pocketnutrition.org">Service status</a>
+          <a href="https://github.com/pocket-nutrition">Source code on GitHub</a>
+        </span>
+      </div>
+      <p class="site-footer-love">Made with <span class="site-footer-heart" role="img" aria-label="love">♥</span> from France</p>
+    </div>
+  </footer>
 </body>
 </html>

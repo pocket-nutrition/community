@@ -1,0 +1,312 @@
+"""Minimal FR/EN internationalisation for the public portal.
+
+No gettext machinery — a flat dict of chrome strings per language plus
+label maps for data enums (food groups, cooking methods, states).
+Language resolution: the cookie set by the EN/FR switch, else EN. The browser's
+Accept-Language is ignored on purpose: every Pocket Nutrition site is in English,
+so the Food Dataset opens in English too, with French one click away.
+"""
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import Request
+
+SUPPORTED = ("en", "fr")
+LANG_COOKIE = "lang"
+
+_GROUPS_EN = {
+    "meat": "meat", "fish": "fish", "shellfish": "shellfish", "vegetable": "vegetable",
+    "fruit": "fruit", "legume": "legume", "cereal": "cereal", "dairy": "dairy",
+    "beverage": "beverage", "egg": "egg", "fat": "fat", "nut_seed": "nut & seed",
+    "spice_herb": "spice & herb", "sweetener": "sweetener", "baked_good": "baked good",
+    "sauce": "sauce", "processed_meat": "processed meat", "prepared_dish": "prepared dish",
+    "seaweed": "seaweed", "alcohol": "alcohol", "other": "other",
+}
+
+_GROUPS_FR = {
+    "meat": "viande", "fish": "poisson", "shellfish": "fruits de mer", "vegetable": "légume",
+    "fruit": "fruit", "legume": "légumineuse", "cereal": "céréale", "dairy": "produit laitier",
+    "beverage": "boisson", "egg": "œuf", "fat": "matière grasse", "nut_seed": "noix & graines",
+    "spice_herb": "épice & herbe", "sweetener": "sucrant", "baked_good": "boulangerie",
+    "sauce": "sauce", "processed_meat": "charcuterie", "prepared_dish": "plat préparé",
+    "seaweed": "algue", "alcohol": "alcool", "other": "autre",
+}
+
+_METHODS_EN = {
+    "raw": "raw", "boiled": "boiled", "steamed": "steamed", "grilled": "grilled",
+    "roasted": "roasted", "fried": "fried", "cooked": "cooked", "dry": "dry",
+}
+
+_METHODS_FR = {
+    "raw": "cru", "boiled": "bouilli", "steamed": "vapeur", "grilled": "grillé",
+    "roasted": "rôti", "fried": "frit", "cooked": "cuit", "dry": "sec",
+}
+
+_STATES_EN = {"raw": "raw", "cooked": "cooked", "processed": "processed"}
+_STATES_FR = {"raw": "cru", "cooked": "cuit", "processed": "transformé"}
+
+_SERVING_MODES_EN = {"item": "item", "weight": "weight", "volume": "volume", "measure": "measure"}
+_SERVING_MODES_FR = {"item": "pièce", "weight": "poids", "volume": "volume", "measure": "mesure"}
+
+TRANSLATIONS: dict[str, dict[str, Any]] = {
+    "en": {
+        "groups": _GROUPS_EN,
+        "methods": _METHODS_EN,
+        "states": _STATES_EN,
+        "serving_modes": _SERVING_MODES_EN,
+        "loading_predictions": "Loading nutritional predictions…",
+        # chrome
+        "meta_description": "Open food dataset by Pocket Nutrition — canonical ingredients, physical properties, cooking relationships and nutritional references from Ciqual, McCance and USDA.",
+        "nav_ingredients": "Ingredients",
+        "nav_about": "About",
+        "nav_contribute": "Contribute",
+        # about page
+        "about_title": "About the Food Dataset",
+        "about_intro": "The Pocket Nutrition Food Dataset is a community-driven, open-source knowledge base designed for precise cooking calculations. It aggregates and unifies nutritional data from authoritative public sources (Ciqual, McCance & Widdowson, USDA).",
+        "about_ingredient_title": "What is an ingredient?",
+        "about_ingredient_body": "An ingredient is a canonical food item in the knowledge base — for example <code>chicken_breast</code> or <code>brown_rice</code>. Each entry has a unique <strong>ID</strong>, a <strong>food group</strong>, and specific <strong>states</strong> (raw, cooked, or processed). It is <strong>not</strong> a recipe (e.g. <code>chicken_basquaise</code>) and not a prepared portion (e.g. <code>200g grilled chicken</code>) — those are built by combining ingredients, not stored as one. An ingredient exists to be used when preparing a dish, so it's entirely fine to add each variety as its own separate ingredient whenever it cooks or eats differently — for example <code>whole_grain_rice</code> versus <code>refined_rice</code>, or <code>dried_apricot</code> versus <code>fresh_apricot</code>.",
+        "about_cooking_title": "Cooking transformations",
+        "about_cooking_body": "Unlike static databases, we map public data onto these canonical ingredients to describe how they transform. We attach physical properties and cooking relationships (water loss, fat absorption) to compute accurate nutritional alterations when cooking at home.",
+        "about_transparent_title": "Transparent & Community-driven",
+        "about_transparent_body": "This dataset is built to be audited and improved. Every ingredient displays a <strong>data confidence score</strong>. If you spot an inaccuracy or missing data, you can help refine the model using the <a class=\"link\" href=\"/ui/knowledge-editor\">Knowledge Editor</a>. All data is licensed under <strong>AGPL-3.0</strong>.",
+        # list page
+        "list_title": "Ingredients",
+        "intro_before": "Explore",
+        "intro_after": "ingredients — physical properties, cooking transformations and nutritional references from Ciqual, McCance & Widdowson and USDA. Click any ingredient to see its full profile.",
+        "search_placeholder": "Search by name, alias or ID… (accent-insensitive)",
+        "all_groups": "all",
+        "col_ingredient": "Ingredient",
+        "col_id": "ID",
+        "col_group": "Group",
+        "col_state": "State",
+        "col_data_confidence": "Data confidence",
+        "col_sources": "Sources",
+        "sort_label": "Sort",
+        "sort_name": "Name",
+        "sort_confidence_desc": "Data confidence: high to low",
+        "sort_confidence_asc": "Data confidence: low to high",
+        "dim_profile": "Profile",
+        "dim_sources": "Verified sources",
+        "dim_cooking": "Cooking data",
+        "sources_verified": "verified",
+        "sources_unverified": "not yet verified",
+        "help_data_confidence": "A 0-100 score blending three things: how complete this ingredient's own profile is, how many reference databases confirm it, and whether its cooking behavior is documented.",
+        "help_sources": "How many external databases (Ciqual, USDA, McCance…) list a matching entry, and whether at least one match has been manually confirmed rather than found automatically.",
+        "help_mapping_confidence": "How confident the matching was that this database entry really is this ingredient — 100% means it was manually confirmed.",
+        "help_yield_factor": "The ratio of cooked weight to 100 g raw — 0.750 means 100 g raw becomes 75 g once cooked (water lost); above 1.000 means the ingredient absorbs liquid.",
+        "help_serving_mode_measure": "This ingredient is served in an approximate, non-standard quantity (e.g. a pinch or a handful) rather than an exact weight or volume.",
+        "sources_none": "no source linked yet",
+        "empty_search": "No ingredients match your search.",
+        "empty_none": "No ingredients found.",
+        "of": "of",
+        "prev": "← Prev",
+        "next": "Next →",
+        # detail page
+        "also_known_as": "Also known as:",
+        "at_a_glance": "At a glance",
+        "typical_preparation": "Typical preparation",
+        "can_eat_raw": "Can eat raw",
+        "can_be_cooked": "Can be cooked",
+        "serving_mode": "Serving mode",
+        "display_unit": "Display unit",
+        "portion": "Portion",
+        "density": "Density",
+        "yes": "Yes",
+        "no": "No",
+        "cooking_relationships": "Cooking relationships",
+        "col_method": "Method",
+        "what_happens": "What happens to 100 g raw",
+        "yield_factor": "Yield factor",
+        "confidence": "Confidence",
+        "source": "Source",
+        "raw_100g": "100 g raw",
+        "gains_weight": "gains weight — absorbs water",
+        "loses_weight": "loses weight — moisture loss",
+        "unchanged": "roughly unchanged",
+        "serving_units": "Serving units",
+        "col_unit": "Unit",
+        "col_label": "Label",
+        "col_volume": "Volume",
+        "col_weight": "Weight",
+        "absorption_factors": "Absorption factors",
+        "absorption_desc": "Fraction of the nutrient retained when cooking media (oil, water) are partially absorbed.",
+        "col_nutrient": "Nutrient",
+        "col_factor": "Factor",
+        "data_provenance": "Data & provenance",
+        "provenance_desc": "How this ingredient is linked to public databases and used to train the prediction model.",
+        "raw_references_title": "Raw source records",
+        "raw_references_desc": "The exact per-100g values reported by each public database (Ciqual, McCance & Widdowson, USDA), before any Pocket Nutrition transformation — grouped by preparation state (raw, dry, boiled…).",
+        "source_mappings": "Source mappings",
+        "feedback_flag_mapping_tip": "Report a problem with this source mapping",
+        "mapping_vote_up_tip": "This mapping looks right to me",
+        "mapping_vote_down_tip": "This mapping looks wrong to me",
+        "mapping_vote_error": "Couldn't record your vote — please try again.",
+        "relationship_vote_up_tip": "This cooking transformation looks right to me",
+        "relationship_vote_down_tip": "This cooking transformation looks wrong to me",
+        "type": "Type",
+        "theoretical": "theoretical",
+        "known": "known",
+        "protein": "Protein",
+        "fat": "Fat",
+        "carbs": "Carbs",
+        "water": "Water",
+        # predictions card
+        "nutritional_values": "Nutritional values",
+        "predicted_subtitle": "(predicted per 100 g, by preparation)",
+        "no_predictions": "No nutritional predictions are available for this ingredient yet.",
+        "service_unreachable": "The prediction service is unreachable right now — try again in a moment.",
+        "energy": "Energy",
+        "fiber": "Fiber",
+        # feedback (report an issue)
+        "feedback_cta": "Report an issue",
+        "feedback_flag_tip": "Report a problem with this value",
+        "feedback_modal_title": "Report an issue",
+        "feedback_pick_category": "What's the problem about?",
+        "feedback_pick_error": "Which one, specifically?",
+        "feedback_current_value": "Current value:",
+        "feedback_comment_label": "Additional details",
+        "feedback_comment_placeholder": "Anything else we should know?",
+        "feedback_submit": "Send report",
+        "feedback_cancel": "Cancel",
+        "feedback_success": "Thanks — your report was received.",
+        "feedback_error_server": "Couldn't send the report right now — please try again in a moment.",
+        "feedback_error_invalid": "That selection isn't valid — please try again.",
+        "feedback_error_empty": "Please describe the problem before sending.",
+    },
+    "fr": {
+        "groups": _GROUPS_FR,
+        "methods": _METHODS_FR,
+        "states": _STATES_FR,
+        "serving_modes": _SERVING_MODES_FR,
+        "loading_predictions": "Chargement des prédictions nutritionnelles…",
+        # chrome
+        "meta_description": "Base de données alimentaire ouverte par Pocket Nutrition — ingrédients canoniques, propriétés physiques, transformations à la cuisson et références nutritionnelles issues de Ciqual, McCance et USDA.",
+        "nav_ingredients": "Ingrédients",
+        "nav_about": "À propos",
+        "nav_contribute": "Contribuer",
+        # about page
+        "about_title": "À propos du Food Dataset",
+        "about_intro": "Le Food Dataset de Pocket Nutrition est une base de connaissances ouverte et communautaire, conçue pour des calculs de cuisson précis. Il agrège et unifie des données nutritionnelles issues de sources publiques de référence (Ciqual, McCance & Widdowson, USDA).",
+        "about_ingredient_title": "Qu'est ce qu'un ingrédient ?",
+        "about_ingredient_body": "Un ingrédient est un aliment canonique de la base de connaissances — par exemple <code>chicken_breast</code> ou <code>brown_rice</code>. Chaque entrée possède un <strong>ID</strong> unique, un <strong>groupe alimentaire</strong>, et des <strong>états</strong> précis (cru, cuit ou transformé). Ce n'est <strong>pas</strong> une recette (par ex. <code>chicken_basquaise</code>) ni une portion préparée (par ex. <code>200g de poulet grillé</code>) — celles-ci se construisent en combinant des ingrédients, elles ne sont pas stockées en tant que tel. Un ingrédient a vocation à être utilisé lors de la préparation d'un plat : il est donc tout à fait légitime d'ajouter chaque variété comme un ingrédient à part dès qu'elle se cuisine ou se mange différemment — par exemple <code>riz complet</code> et <code>riz blanc raffiné</code>, ou <code>fruit sec</code> et <code>fruit frais</code>.",
+        "about_cooking_title": "Transformations à la cuisson",
+        "about_cooking_body": "Contrairement aux bases de données statiques, nous relions les données publiques à ces ingrédients canoniques pour décrire leur transformation. Nous associons des propriétés physiques et des relations de cuisson (perte d'eau, absorption de graisse) pour calculer précisément les altérations nutritionnelles lors de la cuisson à la maison.",
+        "about_transparent_title": "Transparent et communautaire",
+        "about_transparent_body": "Ce jeu de données est conçu pour être audité et amélioré. Chaque ingrédient affiche un <strong>score de fiabilité des données</strong>. Si tu repères une inexactitude ou une donnée manquante, tu peux aider à améliorer le modèle avec le <a class=\"link\" href=\"/ui/knowledge-editor\">Knowledge Editor</a>. Toutes les données sont sous licence <strong>AGPL-3.0</strong>.",
+        # list page
+        "list_title": "Ingrédients",
+        "intro_before": "Explorez",
+        "intro_after": "ingrédients — propriétés physiques, transformations à la cuisson et références nutritionnelles issues de Ciqual, McCance & Widdowson et USDA. Cliquez sur un ingrédient pour voir sa fiche complète.",
+        "search_placeholder": "Rechercher par nom, alias ou ID… (insensible aux accents)",
+        "all_groups": "tous",
+        "col_ingredient": "Ingrédient",
+        "col_id": "ID",
+        "col_group": "Groupe",
+        "col_state": "État",
+        "col_data_confidence": "Fiabilité des données",
+        "col_sources": "Sources",
+        "sort_label": "Trier",
+        "sort_name": "Nom",
+        "sort_confidence_desc": "Fiabilité des données : décroissante",
+        "sort_confidence_asc": "Fiabilité des données : croissante",
+        "dim_profile": "Profil",
+        "dim_sources": "Sources vérifiées",
+        "dim_cooking": "Données de cuisson",
+        "sources_verified": "vérifié",
+        "sources_unverified": "pas encore vérifié",
+        "sources_none": "aucune source liée",
+        "help_data_confidence": "Un score sur 100 combinant trois choses : à quel point le profil de cet ingrédient est complet, combien de bases de référence le confirment, et si son comportement à la cuisson est documenté.",
+        "help_sources": "Combien de bases externes (Ciqual, USDA, McCance…) référencent une entrée correspondante, et si au moins une correspondance a été confirmée manuellement plutôt que trouvée automatiquement.",
+        "help_mapping_confidence": "À quel point la correspondance est fiable — 100% signifie qu'elle a été confirmée manuellement.",
+        "help_yield_factor": "Le rapport entre le poids cuit et 100 g cru — 0,750 signifie que 100 g cru deviennent 75 g une fois cuits (perte d'eau) ; au-dessus de 1,000, l'ingrédient absorbe du liquide.",
+        "help_serving_mode_measure": "Cet ingrédient se sert par une quantité approximative, non standardisée (par ex. une pincée ou une poignée), plutôt qu'un poids ou un volume précis.",
+        "empty_search": "Aucun ingrédient ne correspond à votre recherche.",
+        "empty_none": "Aucun ingrédient trouvé.",
+        "of": "sur",
+        "prev": "← Préc.",
+        "next": "Suiv. →",
+        # detail page
+        "also_known_as": "Aussi appelé :",
+        "at_a_glance": "En bref",
+        "typical_preparation": "Préparation typique",
+        "can_eat_raw": "Se mange cru",
+        "can_be_cooked": "Se cuisine",
+        "serving_mode": "Mode de service",
+        "display_unit": "Unité d'affichage",
+        "portion": "Portion",
+        "density": "Densité",
+        "yes": "Oui",
+        "no": "Non",
+        "cooking_relationships": "Transformations à la cuisson",
+        "col_method": "Méthode",
+        "what_happens": "Ce que deviennent 100 g crus",
+        "yield_factor": "Facteur de rendement",
+        "confidence": "Confiance",
+        "source": "Source",
+        "raw_100g": "100 g cru",
+        "gains_weight": "prend du poids — absorbe de l'eau",
+        "loses_weight": "perd du poids — perte d'eau",
+        "unchanged": "quasi inchangé",
+        "serving_units": "Unités de service",
+        "col_unit": "Unité",
+        "col_label": "Libellé",
+        "col_volume": "Volume",
+        "col_weight": "Poids",
+        "absorption_factors": "Facteurs d'absorption",
+        "absorption_desc": "Fraction du nutriment retenue lorsque les milieux de cuisson (huile, eau) sont partiellement absorbés.",
+        "col_nutrient": "Nutriment",
+        "col_factor": "Facteur",
+        "data_provenance": "Données & provenance",
+        "provenance_desc": "Comment cet ingrédient est relié aux bases publiques et utilisé pour entraîner le modèle de prédiction.",
+        "raw_references_title": "Fiches brutes des sources",
+        "raw_references_desc": "Les valeurs exactes pour 100 g telles que rapportées par chaque base publique (Ciqual, McCance & Widdowson, USDA), avant toute transformation Pocket Nutrition — regroupées par état de préparation (cru, sec, bouilli…).",
+        "source_mappings": "Correspondances sources",
+        "feedback_flag_mapping_tip": "Signaler un problème sur cette correspondance",
+        "mapping_vote_up_tip": "Cette correspondance me semble correcte",
+        "mapping_vote_down_tip": "Cette correspondance me semble incorrecte",
+        "mapping_vote_error": "Impossible d'enregistrer ton vote — réessaie.",
+        "relationship_vote_up_tip": "Cette transformation à la cuisson me semble correcte",
+        "relationship_vote_down_tip": "Cette transformation à la cuisson me semble incorrecte",
+        "type": "Type",
+        "theoretical": "théorique",
+        "known": "connu",
+        "protein": "Protéines",
+        "fat": "Lipides",
+        "carbs": "Glucides",
+        "water": "Eau",
+        # predictions card
+        "nutritional_values": "Valeurs nutritionnelles",
+        "predicted_subtitle": "(prédites pour 100 g, par préparation)",
+        "no_predictions": "Aucune prédiction nutritionnelle n'est encore disponible pour cet ingrédient.",
+        "service_unreachable": "Le service de prédiction est momentanément indisponible — réessayez dans un instant.",
+        "energy": "Énergie",
+        "fiber": "Fibres",
+        # feedback (report an issue)
+        "feedback_cta": "Signaler un problème",
+        "feedback_flag_tip": "Signaler un problème sur cette valeur",
+        "feedback_modal_title": "Signaler un problème",
+        "feedback_pick_category": "De quoi s'agit-il ?",
+        "feedback_pick_error": "Plus précisément ?",
+        "feedback_current_value": "Valeur actuelle :",
+        "feedback_comment_label": "Précisions complémentaires",
+        "feedback_comment_placeholder": "Autre chose à préciser ?",
+        "feedback_submit": "Envoyer",
+        "feedback_cancel": "Annuler",
+        "feedback_success": "Merci, votre signalement a bien été reçu.",
+        "feedback_error_server": "Impossible d'envoyer le signalement pour le moment — réessayez dans un instant.",
+        "feedback_error_invalid": "Cette sélection n'est pas valide — merci de réessayer.",
+        "feedback_error_empty": "Merci de décrire le problème avant d'envoyer.",
+    },
+}
+
+
+def resolve_lang(request: Request) -> str:
+    cookie = request.cookies.get(LANG_COOKIE)
+    return cookie if cookie in SUPPORTED else "en"
+
+
+def i18n_context(request: Request) -> dict[str, Any]:
+    """Jinja context processor: expose lang + translations to every template."""
+    lang = resolve_lang(request)
+    return {"lang": lang, "t": TRANSLATIONS[lang]}

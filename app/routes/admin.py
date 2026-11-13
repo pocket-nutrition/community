@@ -13,7 +13,8 @@ _api_key_header = APIKeyHeader(name="X-Reload-Token", auto_error=False)
 
 
 def _verify_token(token: str | None = Security(_api_key_header)) -> None:
-    if token != settings.reload_token:
+    # An unset RELOAD_TOKEN disables the endpoint entirely.
+    if not settings.reload_token or token != settings.reload_token:
         raise HTTPException(status_code=401, detail="Invalid reload token")
 
 
