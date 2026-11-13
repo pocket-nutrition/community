@@ -1,2 +1,2 @@
-fakeredis>=2.0
-pytest>=8.0
+fakeredis>=2.40.0
+pytest>=9.2.0
