@@ -212,13 +212,16 @@
   </style>
 </head>
 <body>
-  {# Shared header, same markup as pocket-nutrition-website (src/components/site-nav): the group
+  {# Shared header, same markup as pocket-nutrition-website (src/components/site-nav) and
+     pocket-nutrition-vault-web (public/index.html): the group
      bar is identical on every Pocket Nutrition site, in English; the site bar is this site's. #}
   <nav class="group-bar" aria-label="Pocket Nutrition sites">
     <div class="group-bar-inner">
       <ul class="group-bar-sites">
         <li><a class="group-bar-link" href="https://pocketnutrition.org/">Website</a></li>
         <li><a class="group-bar-link" href="/ui/ingredients" aria-current="true">Food Dataset</a></li>
+        <li><a class="group-bar-link" href="https://pocketnutrition.org/docs">Docs</a></li>
+        <li><a class="group-bar-link" href="https://me.pocketnutrition.org/">My journal</a></li>
         <li><a class="group-bar-link" href="https://api.pocketnutrition.org/swagger-ui/index.html">API<svg class="group-bar-external" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a></li>
       </ul>
       <a class="group-bar-link" href="https://github.com/pocket-nutrition/pocket-nutrition"><svg class="group-bar-star" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>Star on GitHub<svg class="group-bar-external" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a>
@@ -279,6 +282,7 @@
           <p class="site-footer-heading">Website</p>
           <ul class="site-footer-links">
             <li><a href="https://pocketnutrition.org/#apps">Get the app</a></li>
+            <li><a href="https://me.pocketnutrition.org/">My journal</a></li>
             <li><a href="https://pocketnutrition.org/calculator">Calculator</a></li>
             <li><a href="https://pocketnutrition.org/examples">Examples</a></li>
             <li><a href="https://pocketnutrition.org/privacy">Privacy policy</a></li>
@@ -293,8 +297,9 @@
           </ul>
         </div>
         <div>
-          <p class="site-footer-heading">Developers</p>
+          <p class="site-footer-heading">Docs</p>
           <ul class="site-footer-links">
+            <li><a href="https://pocketnutrition.org/docs/self-hosting/overview">Self-hosting</a></li>
             <li><a href="{{ knowledge_editor_guide_url }}">Knowledge Editor</a></li>
             <li><a href="https://api.pocketnutrition.org/swagger-ui/index.html">API reference</a></li>
           </ul>

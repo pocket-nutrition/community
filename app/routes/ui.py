@@ -23,9 +23,9 @@ from app.search import search_ingredients
 router = APIRouter(prefix="/ui", tags=["ui"])
 templates = Jinja2Templates(directory="app/templates", context_processors=[i18n_context])
 
-# The Knowledge Editor install steps live in its repository README; /ui/knowledge-editor stays
-# as a redirect for older links.
-KNOWLEDGE_EDITOR_GUIDE_URL = "https://github.com/pocket-nutrition/knowledge-editor"
+# The Knowledge Editor install guide lives in the public docs; /ui/knowledge-editor stays as a
+# redirect for older links.
+KNOWLEDGE_EDITOR_GUIDE_URL = "https://pocketnutrition.org/docs/contribute/knowledge-editor"
 templates.env.globals["knowledge_editor_guide_url"] = KNOWLEDGE_EDITOR_GUIDE_URL
 
 _ONE_YEAR = 365 * 24 * 3600
@@ -48,7 +48,7 @@ PAGE_SIZE = 50
 def stats_page(request: Request) -> HTMLResponse:
     stats = redis_store.get_dashboard_stats()
     training_pairs = pg_db.get_training_pairs_stats()
-    return templates.TemplateResponse("stats.html", {
+    return templates.TemplateResponse(request, "stats.html", {
         "request": request,
         "stats": stats,
         "training_pairs": training_pairs,
@@ -62,7 +62,7 @@ def dashboard_redirect() -> RedirectResponse:
 
 @router.get("/about", response_class=HTMLResponse)
 def about_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("about.html", {"request": request})
+    return templates.TemplateResponse(request, "about.html", {"request": request})
 
 
 @router.get("/knowledge-editor", include_in_schema=False)
@@ -82,7 +82,7 @@ def ingredients_page(
     slugs = _get_slugs(group or None)
     ingredients, completeness, pagination = _paginate(slugs, page, q=q or None, sort=sort)
     group_counts = redis_store.count_ingredients_by_group()
-    return templates.TemplateResponse("ingredients.html", {
+    return templates.TemplateResponse(request, "ingredients.html", {
         "request": request,
         "ingredients": ingredients,
         "completeness": completeness,
@@ -102,7 +102,7 @@ def ingredients_search(
     sort = sort if sort in _SORT_KEYS else DEFAULT_SORT
     slugs = _get_slugs(group or None)
     ingredients, completeness, pagination = _paginate(slugs, page, q=q or None, sort=sort)
-    response = templates.TemplateResponse("partials/ingredient_rows.html", {
+    response = templates.TemplateResponse(request, "partials/ingredient_rows.html", {
         "request": request,
         "ingredients": ingredients,
         "completeness": completeness,
@@ -164,6 +164,7 @@ async def ingredient_predictions(request: Request, slug: str) -> HTMLResponse:
         results = dict(pairs)
 
     return templates.TemplateResponse(
+        request,
         "partials/nutrition_predictions.html",
         {"request": request, "ingredient": ingredient, "results": results, "methods": methods},
     )
@@ -218,6 +219,7 @@ async def ingredient_detail(request: Request, slug: str) -> HTMLResponse:
     )
     completeness = build_completeness(data, tally, len(relationships))
     return templates.TemplateResponse(
+        request,
         "ingredient_detail.html",
         {
             "request": request,
@@ -268,6 +270,7 @@ async def submit_feedback(
     valid_codes = feedback_catalog.CODES_BY_CATEGORY.get(category)
     if valid_codes is None or code not in valid_codes:
         return templates.TemplateResponse(
+            request,
             "partials/feedback_result.html", {"request": request, "ok": False, "message": t["feedback_error_invalid"]},
             status_code=400,
         )
@@ -284,6 +287,7 @@ async def submit_feedback(
     if is_free_comment:
         if not comment:
             return templates.TemplateResponse(
+                request,
                 "partials/feedback_result.html", {"request": request, "ok": False, "message": t["feedback_error_empty"]},
                 status_code=400,
             )
@@ -291,6 +295,7 @@ async def submit_feedback(
     else:
         if not value:
             return templates.TemplateResponse(
+                request,
                 "partials/feedback_result.html", {"request": request, "ok": False, "message": t["feedback_error_empty"]},
                 status_code=400,
             )
@@ -304,6 +309,7 @@ async def submit_feedback(
     }
     ok = await _post_feedback(payload)
     return templates.TemplateResponse(
+        request,
         "partials/feedback_result.html",
         {"request": request, "ok": ok, "message": t["feedback_success"] if ok else t["feedback_error_server"]},
         status_code=200 if ok else 502,
@@ -375,6 +381,7 @@ async def vote_mapping(
     }
     tally = await _post_mapping_vote(payload)
     return templates.TemplateResponse(
+        request,
         "partials/mapping_vote.html",
         {
             "request": request,
@@ -450,6 +457,7 @@ async def vote_relationship(
     }
     tally = await _post_relationship_vote(payload)
     return templates.TemplateResponse(
+        request,
         "partials/relationship_vote.html",
         {
             "request": request,

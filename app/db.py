@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from typing import Any, Generator
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
@@ -13,12 +14,20 @@ _engine = None
 _SessionLocal = None
 
 
+def _psycopg2_url(url: str):
+    """Pin bare postgresql:// URLs to psycopg2 (SQLAlchemy 2.1 defaults to psycopg 3)."""
+    parsed = make_url(url)
+    if parsed.drivername == "postgresql":
+        return parsed.set(drivername="postgresql+psycopg2")
+    return parsed
+
+
 def _get_factory() -> sessionmaker | None:
     global _engine, _SessionLocal
     if not settings.database_url:
         return None
     if _SessionLocal is None:
-        _engine = create_engine(settings.database_url, pool_pre_ping=True)
+        _engine = create_engine(_psycopg2_url(settings.database_url), pool_pre_ping=True)
         _SessionLocal = sessionmaker(bind=_engine)
     return _SessionLocal
 
